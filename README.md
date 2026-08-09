@@ -1,5 +1,12 @@
 # vite-plugin-refresh-guard
 
+[![CI](https://github.com/webkubor/vite-plugin-refresh-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/webkubor/vite-plugin-refresh-guard/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/vite-plugin-refresh-guard.svg)](https://www.npmjs.com/package/vite-plugin-refresh-guard)
+[![license](https://img.shields.io/npm/l/vite-plugin-refresh-guard.svg)](./LICENSE)
+[![vite](https://img.shields.io/badge/vite-%3E%3D4%20%3C9-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
+[![vue](https://img.shields.io/badge/vue-%3E%3D3-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org)
+[![react](https://img.shields.io/badge/react-%3E%3D18-61DAFB?logo=react&logoColor=white)](https://react.dev)
+
 Configurable "there's a new version, here's what happens next" for Vite apps.
 
 Most projects that solve this end up with one of three answers, usually picked by accident and
