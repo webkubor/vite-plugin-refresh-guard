@@ -1,0 +1,88 @@
+{
+  "name": "vite-plugin-refresh-guard",
+  "version": "0.1.0",
+  "description": "Configurable new-version detection + refresh for Vite apps: silent auto-refresh, toast-and-auto-refresh, or a blocking modal — pick the strength that fits your product, framework-agnostic core with Vue and React adapters.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/webkubor/vite-plugin-refresh-guard.git"
+  },
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "version-check",
+    "app-update",
+    "service-worker",
+    "pwa",
+    "refresh",
+    "changelog",
+    "vue",
+    "react"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts"
+    },
+    "./vue": {
+      "types": "./dist/vue/useVersionCheck.d.ts",
+      "import": "./dist/vue/useVersionCheck.js"
+    },
+    "./vue/UpdatePrompt.vue": "./dist/vue/UpdatePrompt.vue",
+    "./react": {
+      "types": "./dist/react/useVersionCheck.d.ts",
+      "import": "./dist/react/useVersionCheck.js"
+    },
+    "./react/UpdatePrompt": {
+      "types": "./dist/react/UpdatePrompt.d.ts",
+      "import": "./dist/react/UpdatePrompt.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "SKILL.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/vue/useVersionCheck.ts src/react/useVersionCheck.ts src/react/UpdatePrompt.tsx --format esm --dts --clean && node scripts/copy-assets.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "compat": "npm run typecheck && npm test && npm run build",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "vite": ">=4 <9",
+    "vue": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "jsdom": "^30.0.1",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.0.0",
+    "vitest": "^3.2.0",
+    "vue": "^3.4.0"
+  }
+}
