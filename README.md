@@ -50,6 +50,8 @@ export default defineConfig({
 <script setup lang="ts">
 import { useVersionCheck } from 'vite-plugin-refresh-guard/vue'
 import UpdatePrompt from 'vite-plugin-refresh-guard/vue/UpdatePrompt.vue'
+import { latestContent } from 'virtual:refresh-guard-changelog'
+// import { isDark } from './your-theme-state' —— 有主题切换的话把这个也传进去
 
 const { hasUpdate, latestInfo, applyUpdate, mode } = useVersionCheck(__REFRESH_GUARD_VERSION__, {
   mode: 'toast-auto', // 'silent' | 'toast-auto' | 'modal-blocking'
@@ -57,21 +59,37 @@ const { hasUpdate, latestInfo, applyUpdate, mode } = useVersionCheck(__REFRESH_G
 </script>
 
 <template>
-  <UpdatePrompt :visible="hasUpdate" :mode="mode" :version="latestInfo?.version" @refresh="applyUpdate" />
+  <UpdatePrompt
+    :visible="hasUpdate" :mode="mode" :version="latestInfo?.version"
+    :changelog-html="latestContent"
+    @refresh="applyUpdate"
+  />
 </template>
 ```
+
+> `:changelog-html` 别漏了——不传的话 `modal-blocking` 弹窗只会显示一个 git hash，用户不知道更新了什么。
+> 站点自己有深色模式的话，把主题状态传给 `:dark`（比如 `:dark="isDark"`），弹窗才会跟着网站主题走，
+> 不然默认只跟着访问者系统的深色模式走，容易出现"网站是浅色、弹窗却是暗的"这种违和场面。
 
 **React**
 
 ```tsx
 import { useVersionCheck } from 'vite-plugin-refresh-guard/react'
 import { UpdatePrompt } from 'vite-plugin-refresh-guard/react/UpdatePrompt'
+// import { latestContent } from 'virtual:refresh-guard-changelog' —— React 项目按各自 loader 处理虚拟模块的方式引入
 
 function App() {
   const { hasUpdate, latestInfo, applyUpdate, mode } = useVersionCheck(__REFRESH_GUARD_VERSION__, {
     mode: 'modal-blocking',
   })
-  return <UpdatePrompt visible={hasUpdate} mode={mode} version={latestInfo?.version} onRefresh={applyUpdate} />
+  return (
+    <UpdatePrompt
+      visible={hasUpdate} mode={mode} version={latestInfo?.version}
+      changelogHtml={latestContent}
+      dark={isDarkMode /* 传你自己的主题状态，不传则始终按浅色渲染 */}
+      onRefresh={applyUpdate}
+    />
+  )
 }
 ```
 

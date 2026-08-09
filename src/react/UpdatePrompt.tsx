@@ -8,11 +8,18 @@ export interface UpdatePromptProps {
   version?: string | null
   /** Optional: e.g. `latestContent` from `virtual:refresh-guard-changelog`, rendered via dangerouslySetInnerHTML — pre-sanitize if it isn't your own trusted file. */
   changelogHtml?: string
+  /**
+   * Explicitly light/dark instead of always rendering light. Pass your app's own theme state
+   * here (e.g. a `useDarkMode()` hook's value) so this modal matches your site's actual theme
+   * toggle. Inline styles can't follow the OS `prefers-color-scheme` on their own, so leaving
+   * this unset always renders light — pass it explicitly if your app supports dark mode.
+   */
+  dark?: boolean
   onRefresh: () => void
 }
 
 // 'silent' has no UI by design — the checker just reloads in the background.
-export function UpdatePrompt({ visible, mode = 'toast-auto', version = null, changelogHtml = '', onRefresh }: UpdatePromptProps) {
+export function UpdatePrompt({ visible, mode = 'toast-auto', version = null, changelogHtml = '', dark = false, onRefresh }: UpdatePromptProps) {
   if (!visible || mode === 'silent' || typeof document === 'undefined') return null
 
   if (mode === 'toast-auto') {
@@ -25,14 +32,17 @@ export function UpdatePrompt({ visible, mode = 'toast-auto', version = null, cha
     )
   }
 
+  const modalStyle = dark ? { ...styles.modal, ...styles.modalDark } : styles.modal
+  const bodyStyle = dark ? { ...styles.body, ...styles.bodyDark } : styles.body
+
   // modal-blocking: no backdrop-click handler on purpose — this is meant to be non-dismissible.
   return createPortal(
     <div style={styles.overlay} role="alertdialog" aria-modal="true">
-      <div style={styles.modal}>
+      <div style={modalStyle}>
         <h3 style={styles.title}>有新版本可用{version ? `：${version}` : ''}</h3>
         {changelogHtml
-          ? <div style={styles.body} dangerouslySetInnerHTML={{ __html: changelogHtml }} />
-          : <p style={{ ...styles.body, color: '#6b7280' }}>刷新页面即可使用最新版本。</p>}
+          ? <div style={bodyStyle} dangerouslySetInnerHTML={{ __html: changelogHtml }} />
+          : <p style={{ ...bodyStyle, color: dark ? '#9ca3af' : '#6b7280' }}>刷新页面即可使用最新版本。</p>}
         <button type="button" style={styles.primaryBtn} onClick={onRefresh}>立即更新</button>
       </div>
     </div>,

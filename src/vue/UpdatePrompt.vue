@@ -9,10 +9,19 @@ const props = withDefaults(defineProps<{
   version?: string | null
   /** Optional: e.g. `latestContent` from `virtual:refresh-guard-changelog`, rendered as-is via v-html — pre-sanitize if it isn't your own trusted file. */
   changelogHtml?: string
+  /**
+   * Explicitly light/dark instead of following the OS `prefers-color-scheme`. Pass your app's
+   * own theme state here (e.g. `isDark.value`) so this modal matches your site's actual theme
+   * toggle instead of the visitor's OS setting — leaving this unset means a site in light mode
+   * can render a dark modal just because the OS is dark, which looks broken. Default: unset
+   * (falls back to `prefers-color-scheme`).
+   */
+  dark?: boolean | null
 }>(), {
   mode: 'toast-auto',
   version: null,
   changelogHtml: '',
+  dark: null,
 })
 
 const emit = defineEmits<{ refresh: [] }>()
@@ -29,7 +38,7 @@ const shown = computed(() => props.visible && props.mode !== 'silent')
     </div>
 
     <div v-if="shown && mode === 'modal-blocking'" class="rg-overlay" role="alertdialog" aria-modal="true">
-      <div class="rg-modal">
+      <div class="rg-modal" :class="{ 'rg-dark': dark === true, 'rg-light': dark === false }">
         <h3 class="rg-title">有新版本可用{{ version ? `：${version}` : '' }}</h3>
         <div v-if="changelogHtml" class="rg-body" v-html="changelogHtml" />
         <p v-else class="rg-body rg-body-empty">刷新页面即可使用最新版本。</p>
@@ -101,8 +110,10 @@ const shown = computed(() => props.visible && props.mode !== 'silent')
 }
 .rg-primary-btn:hover { background: #1d4ed8; }
 
+.rg-modal.rg-dark { background: #1f2937; color: #f3f4f6; }
+.rg-modal.rg-dark .rg-body { color: #d1d5db; }
 @media (prefers-color-scheme: dark) {
-  .rg-modal { background: #1f2937; color: #f3f4f6; }
-  .rg-body { color: #d1d5db; }
+  .rg-modal:not(.rg-light) { background: #1f2937; color: #f3f4f6; }
+  .rg-modal:not(.rg-light) .rg-body { color: #d1d5db; }
 }
 </style>

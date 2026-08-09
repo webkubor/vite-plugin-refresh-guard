@@ -52,6 +52,8 @@ This does two things at build time:
 <script setup lang="ts">
 import { useVersionCheck } from 'vite-plugin-refresh-guard/vue'
 import UpdatePrompt from 'vite-plugin-refresh-guard/vue/UpdatePrompt.vue'
+import { latestContent } from 'virtual:refresh-guard-changelog'
+// import { isDark } from './your-theme-state' — pass this too if your site has a theme toggle
 
 const { hasUpdate, latestInfo, applyUpdate, mode } = useVersionCheck(__REFRESH_GUARD_VERSION__, {
   mode: 'toast-auto', // 'silent' | 'toast-auto' | 'modal-blocking'
@@ -59,21 +61,39 @@ const { hasUpdate, latestInfo, applyUpdate, mode } = useVersionCheck(__REFRESH_G
 </script>
 
 <template>
-  <UpdatePrompt :visible="hasUpdate" :mode="mode" :version="latestInfo?.version" @refresh="applyUpdate" />
+  <UpdatePrompt
+    :visible="hasUpdate" :mode="mode" :version="latestInfo?.version"
+    :changelog-html="latestContent"
+    @refresh="applyUpdate"
+  />
 </template>
 ```
+
+> Don't skip `:changelog-html` — without it, the `modal-blocking` prompt only shows a git hash and
+> the user has no idea what actually changed. If your site has a dark mode, pass your theme state
+> to `:dark` (e.g. `:dark="isDark"`) so the modal follows your site's own theme — otherwise it only
+> follows the visitor's OS dark-mode setting, which can look broken (a light site with a dark modal).
 
 **React**
 
 ```tsx
 import { useVersionCheck } from 'vite-plugin-refresh-guard/react'
 import { UpdatePrompt } from 'vite-plugin-refresh-guard/react/UpdatePrompt'
+// import { latestContent } from 'virtual:refresh-guard-changelog' — wire this up however your React setup handles virtual modules
 
 function App() {
   const { hasUpdate, latestInfo, applyUpdate, mode } = useVersionCheck(__REFRESH_GUARD_VERSION__, {
     mode: 'modal-blocking',
   })
-  return <UpdatePrompt visible={hasUpdate} mode={mode} version={latestInfo?.version} onRefresh={applyUpdate} />
+  return (
+    <UpdatePrompt
+      visible={hasUpdate} mode={mode} version={latestInfo?.version}
+      changelogHtml={latestContent}
+      dark={isDarkMode /* pass your own theme state; omitting it always renders light */}
+      onRefresh={applyUpdate}
+    />
+  )
+}
 }
 ```
 

@@ -1,5 +1,16 @@
 # 更新日志
 
+## v0.1.2 (2026-08-09)
+
+修 `UpdatePrompt` 两个实测踩到的问题（在一个真实项目里第一次接入后暴露的）：
+
+- **弹窗只显示 git hash，看不出更新了什么**：`modal-blocking` 弹窗现在建议配合 `changelog-html`
+  prop 传入 `virtual:refresh-guard-changelog` 的内容——之前这个 prop 就存在但接入时容易漏传，
+  这版把它在 README/SKILL.md 里的位置提得更显眼。
+- **弹窗颜色跟着访问者系统的深色模式走，不跟着网站自己的主题开关走**：Vue/React 版都加了 `dark`
+  prop，显式传入你自己的主题状态（如 `isDark.value`）就能让弹窗配色跟着网站自己的主题走，不传
+  则维持原来的 `prefers-color-scheme` 兜底行为。
+
 ## v0.1.1 (2026-08-09)
 
 - README 改为中文正文 + 英文版（`README.en.md`），CHANGELOG/package.json 描述同步改中文为主
