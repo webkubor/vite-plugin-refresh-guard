@@ -39,10 +39,10 @@ export function UpdatePrompt({ visible, mode = 'toast-auto', version = null, cha
   return createPortal(
     <div style={styles.overlay} role="alertdialog" aria-modal="true">
       <div style={modalStyle}>
-        <h3 style={styles.title}>有新版本可用{version ? `：${version}` : ''}</h3>
+        <h3 style={styles.title}>✨ 有新版本可用{version ? `：${version}` : ''}</h3>
         {changelogHtml
           ? <div style={bodyStyle} dangerouslySetInnerHTML={{ __html: changelogHtml }} />
-          : <p style={{ ...bodyStyle, color: dark ? '#9ca3af' : '#6b7280' }}>刷新页面即可使用最新版本。</p>}
+          : <p style={{ ...bodyStyle, color: dark ? 'var(--rg-body-fg-dark, #9ca3af)' : 'var(--rg-body-fg, #6b7280)' }}>刷新页面即可使用最新版本。</p>}
         <button type="button" style={styles.primaryBtn} onClick={onRefresh}>立即更新</button>
       </div>
     </div>,
@@ -50,32 +50,40 @@ export function UpdatePrompt({ visible, mode = 'toast-auto', version = null, cha
   )
 }
 
+// Every color/radius reads `var(--rg-*, fallback)` first — set these on any ancestor in your
+// own app to re-skin the component to your brand instead of living with generic blue-on-white.
+// See README "Styling".
 const styles: Record<string, React.CSSProperties> = {
   toast: {
     position: 'fixed', right: 16, bottom: 16, zIndex: 9999,
     display: 'flex', alignItems: 'center', gap: 12,
-    padding: '10px 16px', borderRadius: 8,
-    background: '#1f2937', color: '#fff', fontSize: 13,
+    padding: '10px 16px', borderRadius: 'var(--rg-radius, 10px)',
+    background: 'var(--rg-toast-bg, #1f2937)', color: 'var(--rg-toast-fg, #fff)', fontSize: 13,
     boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
   },
   toastBtn: {
     flexShrink: 0, padding: '4px 10px', borderRadius: 6,
     border: '1px solid rgba(255,255,255,0.3)', background: 'transparent',
-    color: '#fff', fontSize: 12, cursor: 'pointer',
+    color: 'inherit', fontSize: 12, cursor: 'pointer',
   },
   overlay: {
     position: 'fixed', inset: 0, zIndex: 9999,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(0,0,0,0.5)',
+    background: 'var(--rg-overlay-bg, rgba(15,15,20,0.55))',
   },
   modal: {
-    width: '90vw', maxWidth: 420, padding: 24, borderRadius: 12,
-    background: '#fff', color: '#111827', boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+    width: '90vw', maxWidth: 420, padding: 28, borderRadius: 'var(--rg-radius, 16px)',
+    background: 'var(--rg-modal-bg, #fff)', color: 'var(--rg-modal-fg, #111827)',
+    boxShadow: '0 20px 50px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.08)',
   },
-  title: { margin: '0 0 12px', fontSize: 16, fontWeight: 700 },
-  body: { margin: '0 0 20px', fontSize: 13, lineHeight: 1.6, color: '#4b5563', maxHeight: '40vh', overflowY: 'auto' },
+  modalDark: {
+    background: 'var(--rg-modal-bg-dark, #1f2937)', color: 'var(--rg-modal-fg-dark, #f3f4f6)',
+  },
+  title: { margin: '0 0 14px', fontSize: 17, fontWeight: 700, letterSpacing: '-0.01em' },
+  body: { margin: '0 0 22px', fontSize: 13.5, lineHeight: 1.7, color: 'var(--rg-body-fg, #4b5563)', maxHeight: '40vh', overflowY: 'auto' },
+  bodyDark: { color: 'var(--rg-body-fg-dark, #d1d5db)' },
   primaryBtn: {
-    width: '100%', padding: 10, border: 'none', borderRadius: 8,
-    background: '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+    width: '100%', padding: 11, border: 'none', borderRadius: 'var(--rg-btn-radius, 10px)',
+    background: 'var(--rg-accent, #2563eb)', color: 'var(--rg-accent-fg, #fff)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
   },
 }

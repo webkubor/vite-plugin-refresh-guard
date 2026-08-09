@@ -146,6 +146,29 @@ import { latestVersion, latestContent } from 'virtual:refresh-guard-changelog'
 
 从你的 `CHANGELOG.md` 里解析 `## vX.Y.Z (date)` 这种格式的标题（跟 Keep a Changelog 及大多数自动生成的更新日志一致），暴露最新一条的版本号和 markdown 正文。这个功能故意跟"什么时候刷新"的逻辑解耦——"展示更新了什么"和"什么时候该刷新"是两个不同的产品决策，本包最初就是从几个把这两件事强行绑死在一起的项目里抽出来的，绑死的下场就是两套机制互相打架。
 
+## 样式定制
+
+`UpdatePrompt` 默认是通用蓝白配色，不假设你的品牌色。所有颜色/圆角都先读一个 `--rg-*` CSS 变量，读不到才用默认值——在你自己项目的全局样式里（`:root` 或任意祖先节点）设置这些变量，就能让弹窗跟你的产品长一个样，不用改包的源码：
+
+```css
+:root {
+  --rg-accent: var(--brand);        /* 主按钮颜色，默认 #2563eb */
+  --rg-accent-fg: #fff;             /* 主按钮文字颜色 */
+  --rg-radius: 16px;                /* 弹窗/toast 圆角 */
+  --rg-modal-bg: #fff;              /* 弹窗背景（浅色） */
+  --rg-modal-fg: #111827;           /* 弹窗文字（浅色） */
+  --rg-modal-bg-dark: #1f2937;      /* 弹窗背景（深色，配合 :dark 或系统深色模式） */
+  --rg-modal-fg-dark: #f3f4f6;
+  --rg-body-fg: #4b5563;            /* 正文文字颜色 */
+  --rg-body-fg-dark: #d1d5db;
+  --rg-overlay-bg: rgba(15, 15, 20, 0.55); /* 弹窗背后的遮罩 */
+  --rg-toast-bg: #1f2937;           /* toast-auto 模式的提示条 */
+  --rg-toast-fg: #fff;
+}
+```
+
+不需要全套都设，只想换主按钮颜色就只设 `--rg-accent` 即可，其余保持默认。
+
 ## 为什么不干脆只用 service worker
 
 如果你已经在跑 service worker，`vite-plugin-pwa` 的 `autoUpdate` 模式本身就是一个很好的 `silent` 实现——本包不是要替代它。本包补的是：一套统一的方式，能拿到 `toast-auto` 或 `modal-blocking` 的体验（裸 service worker 想要这个得自己手写这整套管线）；一个不需要 service worker 的、纯靠轮询 `version.json` 的兜底方案；以及独立的更新日志展示层。哪块需要用哪块，互相不绑定。

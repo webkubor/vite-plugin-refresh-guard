@@ -157,6 +157,29 @@ deciding "when do we reload" are different product decisions, and coupling them 
 of the projects this package was extracted from originally did) is how you end up with two
 mechanisms fighting each other.
 
+## Styling
+
+`UpdatePrompt` ships with a generic blue-on-white look and doesn't assume your brand colors. Every color/radius reads a `--rg-*` CSS custom property first, falling back to a default — set these anywhere in your own global styles (`:root` or any ancestor) to make the modal match your product without touching the package source:
+
+```css
+:root {
+  --rg-accent: var(--brand);        /* primary button color, default #2563eb */
+  --rg-accent-fg: #fff;             /* primary button text color */
+  --rg-radius: 16px;                /* modal/toast corner radius */
+  --rg-modal-bg: #fff;              /* modal background (light) */
+  --rg-modal-fg: #111827;           /* modal text (light) */
+  --rg-modal-bg-dark: #1f2937;      /* modal background (dark, paired with :dark or OS dark mode) */
+  --rg-modal-fg-dark: #f3f4f6;
+  --rg-body-fg: #4b5563;            /* body text color */
+  --rg-body-fg-dark: #d1d5db;
+  --rg-overlay-bg: rgba(15, 15, 20, 0.55); /* backdrop behind the modal */
+  --rg-toast-bg: #1f2937;           /* toast-auto mode's notice bar */
+  --rg-toast-fg: #fff;
+}
+```
+
+You don't need to set all of them — override just `--rg-accent` for a quick brand match and leave the rest at their defaults.
+
 ## Why not just service workers?
 
 `vite-plugin-pwa`'s `autoUpdate` mode is a perfectly good `silent` implementation if you're
