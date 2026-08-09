@@ -1,7 +1,7 @@
 {
   "name": "vite-plugin-refresh-guard",
-  "version": "0.1.0",
-  "description": "Configurable new-version detection + refresh for Vite apps: silent auto-refresh, toast-and-auto-refresh, or a blocking modal — pick the strength that fits your product, framework-agnostic core with Vue and React adapters.",
+  "version": "0.1.1",
+  "description": "Vite 应用的可配置版本更新检测+刷新方案：静默自动刷新 / 提示后自动刷新 / 弹窗阻断，按产品需要选档位，核心逻辑框架无关，附 Vue/React 适配层。Configurable new-version detection + refresh for Vite apps — silent / toast-auto / modal-blocking, framework-agnostic core with Vue and React adapters.",
   "type": "module",
   "license": "MIT",
   "repository": {

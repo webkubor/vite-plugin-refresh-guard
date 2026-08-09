@@ -1,5 +1,7 @@
 # vite-plugin-refresh-guard
 
+中文 | [English](./README.en.md)
+
 [![CI](https://github.com/webkubor/vite-plugin-refresh-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/webkubor/vite-plugin-refresh-guard/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/vite-plugin-refresh-guard.svg)](https://www.npmjs.com/package/vite-plugin-refresh-guard)
 [![license](https://img.shields.io/npm/l/vite-plugin-refresh-guard.svg)](./LICENSE)
@@ -7,27 +9,25 @@
 [![vue](https://img.shields.io/badge/vue-%3E%3D3-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org)
 [![react](https://img.shields.io/badge/react-%3E%3D18-61DAFB?logo=react&logoColor=white)](https://react.dev)
 
-Configurable "there's a new version, here's what happens next" for Vite apps.
+给 Vite 项目做"部署了新版本，接下来怎么办"的可配置方案。
 
-Most projects that solve this end up with one of three answers, usually picked by accident and
-never revisited:
+大多数项目最后都会落在这三种答案里的一种，而且往往是随手写的、后来再也没人回头审视过：
 
-- **Silent** — just refresh in the background, the user never notices.
-- **Toast, then auto-refresh** — a small non-blocking notice, then refresh after a short delay.
-- **Blocking modal** — stop the user, make them click "update now" before they can continue.
+- **静默**——后台自动刷新，用户完全无感
+- **提示+自动刷新**——弹个小提示，短暂延迟后自动刷新
+- **强制弹窗**——拦住用户，必须点"立即更新"才能继续用
 
-This package makes that an explicit, per-project choice instead of copy-pasted glue code that
-drifts every time someone touches it. Framework-agnostic core, thin Vue and React adapters.
+这个包把这个选择显式化、可配置化，而不是散落在各项目里、每次改动都会跑偏的胶水代码。核心逻辑跟框架无关，Vue 和 React 各有一层薄适配。
 
-## Install
+## 安装
 
 ```bash
 npm i -D vite-plugin-refresh-guard
 ```
 
-`vue`, `react`/`react-dom`, and `vite` are peer dependencies — install whichever you actually use.
+`vue`、`react`/`react-dom`、`vite` 都是 peerDependency——用哪个装哪个。
 
-## Quick start
+## 快速开始
 
 **`vite.config.ts`**
 
@@ -40,9 +40,9 @@ export default defineConfig({
 })
 ```
 
-This does two things at build time:
-1. Writes `version.json` into your build output (`{ version, buildId, commit, time }`).
-2. Bakes the current version into your bundle as a global, `__REFRESH_GUARD_VERSION__`.
+这一步在构建期做两件事：
+1. 往构建产物里写一个 `version.json`（`{ version, buildId, commit, time }`）
+2. 把当前版本号烘焙进 bundle，成为全局常量 `__REFRESH_GUARD_VERSION__`
 
 **Vue**
 
@@ -75,74 +75,62 @@ function App() {
 }
 ```
 
-Add `/// <reference types="vite-plugin-refresh-guard/client" />` to your `env.d.ts` (or wherever
-your other `vite/client` reference lives) so TypeScript knows about `__REFRESH_GUARD_VERSION__`.
+在 `env.d.ts`（或者你放 `vite/client` reference 的地方）加一行：
+```ts
+/// <reference types="vite-plugin-refresh-guard/client" />
+```
+不然 TypeScript 不认识 `__REFRESH_GUARD_VERSION__`。
 
-Don't want the prebuilt UI? Use `useVersionCheck`'s `hasUpdate`/`latestInfo`/`applyUpdate` and
-render your own — the components are a starting point, not a requirement.
+不想用现成 UI？直接用 `useVersionCheck` 返回的 `hasUpdate`/`latestInfo`/`applyUpdate` 自己渲染——预置组件只是个起点，不是必须用它。
 
-## Picking a mode
+## 怎么选档位
 
-| Mode | User sees | When to use it |
+| 档位 | 用户看到什么 | 什么时候用 |
 |---|---|---|
-| `silent` | Nothing. Refreshes in the background. | Internal tools, dashboards nobody's mid-task in. Pairs well with `vite-plugin-pwa`'s own `registerType: 'autoUpdate'` doing the same job at the service-worker level — you may not need this package's polling at all in that case, just wire `notifyExternalUpdate()` (see below) if you want changelog display too. |
-| `toast-auto` (default) | A small corner notice, then refresh after `autoRefreshDelay` (default 1.2s). | Most consumer-facing apps. Gives the user a beat to notice, doesn't block them. |
-| `modal-blocking` | A centered, non-dismissible prompt. Refresh only on click. | Apps where refreshing mid-task loses real work (a half-filled form, an in-progress upload), or where you want confirmation before applying (matches what we found in ModelGo's console app). |
+| `silent` | 什么都看不到，后台自动刷新 | 内部工具、没人会"做到一半"的看板类页面。如果项目已经在用 `vite-plugin-pwa` 的 `registerType:'autoUpdate'`，同一件事它在 SW 层已经做了，这种情况下你可能根本不需要本包的轮询，只想要 changelog 展示的话接 `notifyExternalUpdate()`（见下文）就够 |
+| `toast-auto`（默认） | 角落小提示，`autoRefreshDelay`（默认1.2秒）后自动刷新 | 大多数 to-C 产品。给用户一个心理准备，但不打断 |
+| `modal-blocking` | 居中弹窗，不可点遮罩关闭，点了才刷新 | 刷新会丢失用户没保存的东西（表单填一半、正在上传），或者想要用户明确确认才应用更新的场景 |
 
-You're not locked into version.json polling only — `checker.notifyExternalUpdate(info)` (also
-exposed by both adapters) feeds an update signal from anywhere else into the same mode logic,
-most usefully from `vite-plugin-pwa`'s `registerSW({ onNeedRefresh })` callback if you're also
-running a service worker and want its update event to drive the same toast/modal instead of
-(or in addition to) polling.
+不是只能靠轮询 version.json——`checker.notifyExternalUpdate(info)`（两个框架适配层都暴露了这个方法）可以把任何来源的更新信号接进同一套档位逻辑，最常见的用法是接 `vite-plugin-pwa` 的 `registerSW({ onNeedRefresh })` 回调，如果你本来就在跑 service worker，想让它的更新事件也走同一套 toast/弹窗，而不是（或者加上）轮询。
 
-## Options
+## 配置项
 
 ```ts
 interface VersionCheckerOptions {
-  versionUrl?: string          // default '/version.json'
-  interval?: number            // default 5 minutes; 0 disables polling
-  checkOnVisible?: boolean     // re-check on tab focus, default true
-  mode?: 'silent' | 'toast-auto' | 'modal-blocking' // default 'toast-auto'
-  autoRefreshDelay?: number    // toast-auto only, default 1200ms
-  refreshCooldown?: number     // min ms between forced refreshes, default 90s — guards against reload loops
-  guardChunkErrors?: boolean   // force-refresh once on a stale-chunk load failure, default true
-  onUpdateAvailable?: (info) => void | boolean // return false to take over the UI yourself
-  onBeforeRefresh?: () => void // flush analytics etc. right before location.reload()
+  versionUrl?: string          // 默认 '/version.json'
+  interval?: number            // 默认 5 分钟；设 0 关闭轮询
+  checkOnVisible?: boolean     // 标签页重新可见时也查一次，默认 true
+  mode?: 'silent' | 'toast-auto' | 'modal-blocking' // 默认 'toast-auto'
+  autoRefreshDelay?: number    // 仅 toast-auto 用，默认 1200ms
+  refreshCooldown?: number     // 两次强制刷新之间的最短间隔，默认 90 秒——防止刷新死循环
+  guardChunkErrors?: boolean   // 旧 chunk 加载失败时强刷一次，默认 true
+  onUpdateAvailable?: (info) => void | boolean // 返回 false 可以自己接管 UI
+  onBeforeRefresh?: () => void // 真正 location.reload() 前调用，适合在这里补埋点
 }
 ```
 
-Plugin options (`refreshGuard({ ... })`):
+插件配置（`refreshGuard({ ... })`）：
 
 ```ts
 interface RefreshGuardPluginOptions {
-  version?: string        // default: read from package.json
-  includeCommit?: boolean // default true; silently omitted outside a git repo
-  outFile?: string        // default 'version.json'
-  changelog?: string | false // default 'CHANGELOG.md'; false disables the virtual module
+  version?: string        // 默认读 package.json
+  includeCommit?: boolean // 默认 true；非 git 仓库时静默省略，不报错
+  outFile?: string        // 默认 'version.json'
+  changelog?: string | false // 默认 'CHANGELOG.md'；false 关闭虚拟模块
 }
 ```
 
-## Changelog display (optional, decoupled from the refresh decision)
+## 更新日志展示（可选，跟"要不要刷新"这个决定解耦）
 
 ```ts
 import { latestVersion, latestContent } from 'virtual:refresh-guard-changelog'
 ```
 
-Parses `## vX.Y.Z (date)` headings (same format as Keep a Changelog / most auto-generated
-changelogs) out of your `CHANGELOG.md` and exposes the latest section's version and markdown
-body. This is independent of the refresh-trigger logic on purpose — showing "what's new" and
-deciding "when do we reload" are different product decisions, and coupling them (as several
-of the projects this package was extracted from originally did) is how you end up with two
-mechanisms fighting each other.
+从你的 `CHANGELOG.md` 里解析 `## vX.Y.Z (date)` 这种格式的标题（跟 Keep a Changelog 及大多数自动生成的更新日志一致），暴露最新一条的版本号和 markdown 正文。这个功能故意跟"什么时候刷新"的逻辑解耦——"展示更新了什么"和"什么时候该刷新"是两个不同的产品决策，本包最初就是从几个把这两件事强行绑死在一起的项目里抽出来的，绑死的下场就是两套机制互相打架。
 
-## Why not just service workers?
+## 为什么不干脆只用 service worker
 
-`vite-plugin-pwa`'s `autoUpdate` mode is a perfectly good `silent` implementation if you're
-already running a service worker — this package doesn't replace that. What it adds is: a
-uniform way to also get a `toast-auto` or `modal-blocking` experience (which a bare service
-worker can't give you a clean hook for without writing this exact plumbing yourself), a
-non-PWA `version.json`-polling fallback for apps that don't want a service worker at all, and
-the changelog-display layer. Use whichever pieces you need; they're independent.
+如果你已经在跑 service worker，`vite-plugin-pwa` 的 `autoUpdate` 模式本身就是一个很好的 `silent` 实现——本包不是要替代它。本包补的是：一套统一的方式，能拿到 `toast-auto` 或 `modal-blocking` 的体验（裸 service worker 想要这个得自己手写这整套管线）；一个不需要 service worker 的、纯靠轮询 `version.json` 的兜底方案；以及独立的更新日志展示层。哪块需要用哪块，互相不绑定。
 
 ## License
 
