@@ -1,5 +1,13 @@
 # 更新日志
 
+## v0.2.0 (2026-08-13)
+
+**dev 下改 CHANGELOG.md 即时热更新**：此前虚拟模块 `virtual:refresh-guard-changelog` 的内容在 dev server 启动时缓存，改了 CHANGELOG 必须重启 vite 才生效——在真实项目里踩到（改了日志以为没生效，重启才发现）。
+
+- 插件 `load()` 里对 changelog 文件调 `this.addWatchFile()` 声明依赖（root 外的 changelog 也强制监听）
+- 新增 `hotUpdate`（Vite 6-8 per-environment 钩子）与 `handleHotUpdate`（Vite 4-5 兼容）两个钩子：CHANGELOG 变化时 invalidate 虚拟模块并返回它，走 Vite 默认 js-update 推给 importers——页面不用重启，更新日志自动刷新
+- `readChangelog` 导出并补单测（版本号解析 / 正文截取 / 日期行剔除 / `false` 关闭 / 文件缺失兜底），此前该函数零覆盖
+
 ## v0.1.4 (2026-08-11)
 
 修复自 v0.1.1（甚至更早）起就存在的发布产物残缺问题：`tsconfig.build.json`（构建脚本 `tsc -p tsconfig.build.json` 这一步依赖的配置文件）一直没有提交进 git，导致：
