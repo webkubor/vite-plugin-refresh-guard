@@ -1,13 +1,33 @@
-# vite-plugin-refresh-guard
+<h1 align="center">🔄 vite-plugin-refresh-guard</h1>
 
-中文 | [English](./README.en.md)
+<p align="center">
+  <strong>部署了新版本，接下来怎么办 —— 把这件事变成一行配置。</strong><br>
+  静默刷新 / 提示后刷新 / 弹窗阻断，三选一写进 config；<br>
+  核心逻辑与框架无关，Vue 与 React 各一层薄适配。
+</p>
 
-[![CI](https://github.com/webkubor/vite-plugin-refresh-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/webkubor/vite-plugin-refresh-guard/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/vite-plugin-refresh-guard.svg)](https://www.npmjs.com/package/vite-plugin-refresh-guard)
-[![license](https://img.shields.io/npm/l/vite-plugin-refresh-guard.svg)](./LICENSE)
-[![vite](https://img.shields.io/badge/vite-%3E%3D4%20%3C9-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
-[![vue](https://img.shields.io/badge/vue-%3E%3D3-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org)
-[![react](https://img.shields.io/badge/react-%3E%3D18-61DAFB?logo=react&logoColor=white)](https://react.dev)
+<p align="center">
+  <a href="https://www.npmjs.com/package/vite-plugin-refresh-guard"><img src="https://img.shields.io/npm/v/vite-plugin-refresh-guard?style=for-the-badge&color=4d6bfe&logo=npm&label=npm" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/vite-plugin-refresh-guard"><img src="https://img.shields.io/npm/dm/vite-plugin-refresh-guard?style=for-the-badge&color=6d7f9c&label=downloads" alt="downloads" /></a>
+  <a href="https://github.com/webkubor/vite-plugin-refresh-guard/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/webkubor/vite-plugin-refresh-guard/ci.yml?style=for-the-badge&label=CI" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/vite-%3E%3D4%20%3C9-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="vite" />
+  <img src="https://img.shields.io/badge/vue-%3E%3D3-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white" alt="vue" />
+  <img src="https://img.shields.io/badge/react-%3E%3D18-61DAFB?style=for-the-badge&logo=react&logoColor=white" alt="react" />
+  <img src="https://img.shields.io/badge/license-MIT-777?style=for-the-badge" alt="MIT" />
+</p>
+
+<p align="center">
+  <a href="./README.en.md">English</a> | 中文
+</p>
+
+## Why This
+
+| | 本插件 | 各项目自己写胶水 | 完全不管 |
+|---|---|---|---|
+| 策略是否显式 | ✅ 写进 config，三选一 | ❌ 散落各处，改一次跑偏一次 | ❌ 没有这回事 |
+| 框架覆盖 | ✅ 核心无关 + Vue / React 适配 | ⚠️ 每个项目复制一遍 | — |
+| 新版本探测 | ✅ 构建产物指纹比对 | ⚠️ 各写各的，边界情况没人管 | ❌ 无 |
+| 用户拿到旧版本时 | ✅ 提示 / 弹窗文案可定制 | ⚠️ 看实现 | ❌ 静默跑旧代码 |
 
 给 Vite 项目做"部署了新版本，接下来怎么办"的可配置方案。
 
