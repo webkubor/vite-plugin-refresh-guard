@@ -1,5 +1,16 @@
 # 更新日志
 
+## v0.2.1 (2026-10-08)
+
+**补上从 0.2.0 起就欠的两件事**（两件都不改运行期行为）：
+
+- **README 重写**（10281B → 精简版）：0.2.0 发布时 README 已经是精简后的版本，但 CHANGELOG
+  没记，属于用户可见变化却无记录 —— 补上。README 随包发布，装 0.2.0 的用户拿到的就是这一版。
+- **补 `.github/workflows/publish.yml`**：0.2.0 当初是手工 `npm publish` 发的，仓库既没有
+  tag 也没有发布工作流，于是 `prepublish-gate` / `readme-gate` **从未在 CI 上被触发过** ——
+  门禁写了等于白写。本次改成 tag `v*` 触发（npm Trusted Publishing / OIDC）。
+
+
 ## v0.2.0 (2026-08-13)
 
 **dev 下改 CHANGELOG.md 即时热更新**：此前虚拟模块 `virtual:refresh-guard-changelog` 的内容在 dev server 启动时缓存，改了 CHANGELOG 必须重启 vite 才生效——在真实项目里踩到（改了日志以为没生效，重启才发现）。
