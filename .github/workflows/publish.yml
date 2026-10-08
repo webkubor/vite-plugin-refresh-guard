@@ -1,0 +1,78 @@
+name: Publish
+
+# 推 v* tag 时自动发 npm。与 ci.yml 的关系：CI 每次 push 都跑 `npm run compat`，
+# 这里在发布前再跑一遍 —— 发布是最后一道门，不依赖「之前某次 CI 应该跑过了」这种假设。
+#
+# 发版门禁只挂在 `package.json#scripts.prepublishOnly` 上（npm publish 一定执行它），
+# 所以本地 / CI / 手工 `npm publish` 走的是同一条路径、同一个脚本
+# （真源 CortexOS/scripts/release-gate/prepublish-gate.mjs，本仓一份拷贝）。
+# 判据只保留一份，就不在这里再抄一遍 need 数组。
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # gh release create
+      id-token: write   # npm Trusted Publishing via GitHub OIDC
+    steps:
+      # 不需要 fetch-depth: 0 —— 本 workflow 不跑 `git describe` 取区间，
+      # release notes 直接用 --generate-notes。
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Ensure OIDC-capable npm
+        run: npm install --global 'npm@^11.5.1'
+
+      # 必须 install：本插件零**运行时**依赖，但下面的 `npm run compat` 要调
+      # tsup / tsc / vitest（全是 devDependencies）。改依赖时别只改这一个工作流。
+      - run: npm ci
+
+      - name: 校验（与 ci.yml 同一套：typecheck + test + build）
+        run: npm run compat
+
+      # tag 名必须与 package.json version 一致，防止「tag 是 v0.2.1 发的却是 0.2.0」；
+      # 同时探测该版本是否已发过 npm（重推同一 tag 时不报错、不重复发）。
+      #
+      # 包名从 package.json 读，不在这里写死：写死就多了一处「改名/改 scope 要记得同步」
+      # 的地方，而这个仓的坑正是「判据拆散到多处」。
+      - name: 校验 tag 与版本一致性并探测 npm
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VER="$(node -p 'require("./package.json").version')"
+          NAME="$(node -p 'require("./package.json").name')"
+          if [ "$TAG" != "$VER" ]; then
+            echo "tag v$TAG 与 package.json version $VER 不一致"; exit 1
+          fi
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          if npm view "$NAME@$VER" version >/dev/null 2>&1; then
+            echo "published=true"  >> "$GITHUB_OUTPUT"
+            echo "v$VER 已在 npm 上，将跳过 publish"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: npm publish
+        if: steps.ver.outputs.published == 'false'
+        run: npm publish --access public
+
+      # 本仓没有 release-please，Release 只能在这里建，所以幂等探测是必需的：
+      # 重推同一 tag 时 `gh release create` 会撞 422 让整个 Publish 标红，
+      # 而 npm 其实早就发成功了。「已经存在」是正常情况，不该算失败。
+      - name: GitHub Release（缺失时补建）
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "release $GITHUB_REF_NAME 已存在，跳过"
+          else
+            gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
