@@ -1,12 +1,23 @@
 name: Publish
 
-# 推 v* tag 时自动发 npm。与 ci.yml 的关系：CI 每次 push 都跑 `npm run compat`，
-# 这里在发布前再跑一遍 —— 发布是最后一道门，不依赖「之前某次 CI 应该跑过了」这种假设。
+# ⚠️ 当前发布能力仍被阻断（2026-10-08 核实）：本机 npm 身份是 webkubor，
+# 而 npm 上 vite-plugin-refresh-guard 的 owner 是 kubor <wangenbo@modelgo.com>。
+# 下面这个 workflow 用 GitHub OIDC 发包，而 OIDC 的 trusted publisher
+# **必须配置在包 owner 账号（kubor）下**（npmjs.com 网页设置，本地改不了）。
+# 在那之前：workflow 配好了也发不出去，看到红色失败别以为流程坏了。
 #
-# 发版门禁只挂在 `package.json#scripts.prepublishOnly` 上（npm publish 一定执行它），
-# 所以本地 / CI / 手工 `npm publish` 走的是同一条路径、同一个脚本
-# （真源 CortexOS/scripts/release-gate/prepublish-gate.mjs，本仓一份拷贝）。
-# 判据只保留一份，就不在这里再抄一遍 need 数组。
+# 另一条硬约束：npm 版本不可变。0.2.0 已于 2026-08-13 发布，重发会被 registry 拒。
+# 要送新内容上必须先 bump 版本（0.2.1+）再打对应 tag。
+#
+# 历史事实：这个包 0.1.0→0.2.0 共 6 个版本、首发 2026-08-09，但**仓库一个 tag 都没有、
+# 也没有 publish workflow** —— 也就是说 0.2.0 当初是手动发的，门禁（prepublish-gate +
+# readme-gate 早已串在 prepublishOnly 里）从来没在 CI 上被触发过。本 MR 补的就是这段。
+#
+# 范本：~/dev/dsh-plugins/dsh-bloom-theme/.github/workflows/publish.yml（同族的 OIDC 模式）
+
+# 推 v* tag 时自动发 npm。与 ci.yml 的关系：CI 每次 push 都跑校验，
+# 这里在发布前再跑一遍同样的三件套 —— 发布是最后一道门，不依赖
+# 「之前某次 CI 应该跑过了」这种假设。
 on:
   push:
     tags: ['v*']
@@ -18,42 +29,52 @@ jobs:
       contents: write   # gh release create
       id-token: write   # npm Trusted Publishing via GitHub OIDC
     steps:
-      # 不需要 fetch-depth: 0 —— 本 workflow 不跑 `git describe` 取区间，
-      # release notes 直接用 --generate-notes。
+      # 来定区间。默认的 shallow clone(depth=1)只有一个 commit,describe 直接失败,
+      # 区间退化成「只有 release commit」,而那条被脚本过滤掉 → 静默什么都不补。
+      # v0.8.4 就是这么漏的:步骤跑了、退出码 0、notes 一个字没加。
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 22
           registry-url: https://registry.npmjs.org
-          cache: npm
 
       - name: Ensure OIDC-capable npm
         run: npm install --global 'npm@^11.5.1'
 
-      # 必须 install：本插件零**运行时**依赖，但下面的 `npm run compat` 要调
-      # tsup / tsc / vitest（全是 devDependencies）。改依赖时别只改这一个工作流。
+      # 必须 install：prepublishOnly 里串着 prepublish-gate.mjs + readme-gate.mjs，
+      # 它们是本仓的发布门禁（写好了但过去从没在 CI 上被触发过）。漏掉这步 → 门禁不跑直接发。
       - run: npm ci
 
-      - name: 校验（与 ci.yml 同一套：typecheck + test + build）
-        run: npm run compat
+      # 产物校验不在这里写死清单 —— 见下面的说明与 package.json#prepublishOnly。
+      - name: 语法检查 + 自检
+        run: |
+          node --check lib/client.js && node --check lib/index.js
+          npm run check
 
-      # tag 名必须与 package.json version 一致，防止「tag 是 v0.2.1 发的却是 0.2.0」；
-      # 同时探测该版本是否已发过 npm（重推同一 tag 时不报错、不重复发）。
+      # 发版门禁只挂在 `package.json#scripts.prepublishOnly` 上（npm publish 一定执行它），
+      # 所以本地 / CI / `cs kyvault run … -- npm publish` 走的是同一条路径、同一个脚本
+      # （真源 CortexOS/scripts/release-gate/prepublish-gate.mjs，各仓一份拷贝）。
       #
-      # 包名从 package.json 读，不在这里写死：写死就多了一处「改名/改 scope 要记得同步」
-      # 的地方，而这个仓的坑正是「判据拆散到多处」。
+      # 2026-09-26：这里原先硬编码了 need 数组，而数组里**没有 assets** —— README 里
+      # 11 张相对路径截图因此从没进过 tarball，npm 页面上一直是坏图，CI 却全绿。
+      # 「多处各拦一道」的实际效果是把判据拆散，删掉之后只剩一份。
+
+      # tag 名必须与 package.json version 一致，防止「tag 是 v0.3.5 发的却是 0.3.4」；
+      # 同时探测该版本是否已发过 npm（重推同一 tag 时不报错、不重复发）
       - name: 校验 tag 与版本一致性并探测 npm
         id: ver
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           VER="$(node -p 'require("./package.json").version')"
-          NAME="$(node -p 'require("./package.json").name')"
           if [ "$TAG" != "$VER" ]; then
             echo "tag v$TAG 与 package.json version $VER 不一致"; exit 1
           fi
           echo "ver=$VER" >> "$GITHUB_OUTPUT"
-          if npm view "$NAME@$VER" version >/dev/null 2>&1; then
+          if npm view "dsh-bloom-theme@$VER" version >/dev/null 2>&1; then
             echo "published=true"  >> "$GITHUB_OUTPUT"
             echo "v$VER 已在 npm 上，将跳过 publish"
           else
@@ -64,15 +85,32 @@ jobs:
         if: steps.ver.outputs.published == 'false'
         run: npm publish --access public
 
-      # 本仓没有 release-please，Release 只能在这里建，所以幂等探测是必需的：
-      # 重推同一 tag 时 `gh release create` 会撞 422 让整个 Publish 标红，
-      # 而 npm 其实早就发成功了。「已经存在」是正常情况，不该算失败。
+      # Release 由 release-please 建（它的配置里 skip-github-release: false），
+      # 这里只在它没建成时补一个，绝不重复建 —— v0.3.5 实测就是两边都建，
+      # 后建的这步撞 `HTTP 422 Release.tag_name already exists` 让整个 Publish 标红，
+      # 而其实 npm 已经发成功了。「已经存在」是正常情况，不该算失败。
+      #
+      # 注意这步**不挂 published == 'false'**：npm 发没发过，跟 Release 建没建成
+      # 是两件独立的事。挂上去反而让补建在最需要它的场景失效 —— npm 已发成功、
+      # 但 Release 没建起来时重推 tag，published 是 true，补建会被整个跳过，
+      # Release 永远补不上。幂等性由下面的 `gh release view` 探测保证，不需要外层门控。
       - name: GitHub Release（缺失时补建）
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "release $GITHUB_REF_NAME 已存在，跳过"
+            echo "release $GITHUB_REF_NAME 已由 release-please 建好，跳过"
           else
             gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
           fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # release-please 的 changelog 只取 commit 的 subject 行 —— 那是
+      # conventional-changelog 的规范，body 一律丢掉。而本项目的 commit body 才是
+      # 有价值的部分（现象 → 根因 → 修法 → 实测数字）。于是 Release 页面上只剩
+      # 一行标题，点进 commit 才知道背后是怎么回事。
+      # 这一步把区间内每个 commit 的 body 折叠追加到 notes 末尾：
+      # 顶部仍是简洁列表（适合扫读），底部可展开（适合想知道为什么的人）。
+      # 幂等 —— 重跑不会重复追加。
+      - name: Release notes 补详细说明
         env:
           GH_TOKEN: ${{ github.token }}
