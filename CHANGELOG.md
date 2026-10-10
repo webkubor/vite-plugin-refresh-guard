@@ -1,5 +1,20 @@
 # 更新日志
 
+## v0.2.2 (2026-10-09)
+
+**只动 npm 元数据，一行运行期代码没改** —— 目的是让插件在「版本更新提示」这个品类里被搜到。
+
+查了官方 [Vite Plugin Registry](https://registry.vite.dev/plugins)（真源 [vitejs/vite-plugin-registry](https://github.com/vitejs/vite-plugin-registry)，每天从 npm 抓一次，全库 6128 个插件）：插件**早已被收录**，但同品类可见性差得离谱 —— `@plugin-web-update-notification/vite` 周下载 12,934，本插件 132。
+
+根因不是代码，是词。registry 的搜索是**对 name + description + keywords 做原始子串匹配、不分词**（见 `PluginList.vue`），而本插件这三处都没有 `update notification` 这个连续子串；旧 description 还是中文打头，英文用户搜英文词完全命中不到。竞品的包名本身就是 `web-update-notification`，等于三重命中。
+
+- **`description` 改成英文品类词前置**：`Vite plugin for web update notification — detect a new version on every page load and prompt users to reload…`，中文压到句尾，中文搜索照样命中。
+- **`keywords` 补 7 个品类词**：`web-update-notification` / `update-notification` / `new-version` / `auto-reload` / `auto-refresh` / `force-refresh` / `更新提示`，原有 10 个全部保留。子串匹配下必须写**连字符整词** —— 只写 `update`，搜 `update notification` 是匹配不到的。
+- **带空格的短语（`new version` / `auto reload` / `force refresh`）放 description，不放 keywords**：registry 是原始子串匹配，`force-refresh` 匹配不到用户手打的 `force refresh`。实测两种写法命中数相同，但 keywords 连字符+空格双写要 21 个（npm 页面显示重复标签），靠 description 承载只要 17 个。按 registry 的真实判据跑 22 个真实搜索词：**0.2.1 命中 6 个，改完 16 个**。
+- **新增 `compatiblePackages`**（registry 官方扩展字段，带 `$schema`）：`rollup` / `rolldown` 从自动推断的 `unknown` 改成显式 `incompatible` + 原因（本插件依赖 Vite 的 `config` / `configResolved`，Rollup 不调这两个钩子）。
+
+⚠️ 一处边界要说清：`compatiblePackages` 修的是**声明是否诚实**，不是筛选器可见性 —— registry 判据是 `if (type === 'incompatible' || type === 'unknown') return false`，两种状态在按 rollup / rolldown 版本筛选时**都会被隐藏**。真正的可见性杠杆只有 `description` 与 `keywords`。
+
 ## v0.2.1 (2026-10-08)
 
 **补上从 0.2.0 起就欠的两件事**（两件都不改运行期行为）：
