@@ -1,7 +1,8 @@
 {
   "name": "vite-plugin-refresh-guard",
-  "version": "0.2.1",
-  "description": "Vite 应用的可配置版本更新检测+刷新方案：静默自动刷新 / 提示后自动刷新 / 弹窗阻断，按产品需要选档位，核心逻辑框架无关，附 Vue/React 适配层。Configurable new-version detection + refresh for Vite apps — silent / toast-auto / modal-blocking, framework-agnostic core with Vue and React adapters.",
+  "version": "0.2.2",
+  "$schema": "https://raw.githubusercontent.com/vitejs/vite-plugin-registry/refs/heads/main/data/schema/extended-package-json.schema.json",
+  "description": "Vite plugin for web update notification — detect a new version on every page load and prompt users to reload: silent auto reload, force refresh, toast prompt, or blocking modal. Framework-agnostic core with Vue and React adapters. Vite 应用版本更新检测与自动刷新方案。",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -11,14 +12,21 @@
   "keywords": [
     "vite",
     "vite-plugin",
+    "web-update-notification",
+    "update-notification",
+    "new-version",
     "version-check",
     "app-update",
+    "auto-reload",
+    "auto-refresh",
+    "force-refresh",
+    "refresh",
     "service-worker",
     "pwa",
-    "refresh",
     "changelog",
     "vue",
-    "react"
+    "react",
+    "更新提示"
   ],
   "exports": {
     ".": {
@@ -70,6 +78,22 @@
     },
     "react-dom": {
       "optional": true
+    }
+  },
+  "compatiblePackages": {
+    "schemaVersion": 1,
+    "vite": {
+      "type": "compatible",
+      "versions": ">=4 <10",
+      "note": "Vite 6-8 走 per-environment hotUpdate，Vite 4-5 兜底 handleHotUpdate；两个钩子都实现了。"
+    },
+    "rollup": {
+      "type": "incompatible",
+      "reason": "Vite-only：版本号与项目根在 Vite 的 config / configResolved 钩子里解析，Rollup 不调用这两个钩子，虚拟模块 virtual:refresh-guard-changelog 的 load 会直接抛错。"
+    },
+    "rolldown": {
+      "type": "incompatible",
+      "reason": "Vite-only：本插件不是 Rolldown 插件，依赖 Vite 的配置钩子与 dev server 的 HMR 生命周期。"
     }
   },
   "devDependencies": {
