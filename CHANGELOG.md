@@ -1,5 +1,10 @@
 # 更新日志
 
+## v0.3.1 (2026-10-18)
+
+- **组件依赖纯净化 (`UpdateCard.vue`)**：
+  优化 `UpdateCard.vue` 的 Props 声明与要点解析器为 SFC 内联实现，消除对外部相对路径文件的类型与函数引用，避免在跨包/无 Node fs 环境的某些 Vue 编译管道（如纯客户端编译）中报 `compileScript No fs option provided` 错误。
+
 ## v0.3.0 (2026-10-18)
 
 - **全量更新日志导出 (`allVersions`)**：

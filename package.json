@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-refresh-guard",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "$schema": "https://raw.githubusercontent.com/vitejs/vite-plugin-registry/refs/heads/main/data/schema/extended-package-json.schema.json",
   "description": "Vite plugin for web update notification — detect a new version on every page load and prompt users to reload: silent auto reload, force refresh, toast prompt, or blocking modal. Framework-agnostic core with Vue and React adapters. Vite 应用版本更新检测与自动刷新方案。",
   "type": "module",

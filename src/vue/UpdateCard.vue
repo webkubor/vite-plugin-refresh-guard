@@ -1,9 +1,49 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { extractBulletPoints } from '../core/changelog'
-import type { UpdateCardProps } from '../core/types'
 
-const props = withDefaults(defineProps<UpdateCardProps>(), {
+function parseBulletPoints(text: string | null | undefined): string[] {
+  if (!text || typeof text !== 'string') return []
+  const lines = text.split('\n')
+  const bullets: string[] = []
+  for (const line of lines) {
+    const trimmed = line.trim()
+    const m = trimmed.match(/^(?:[-*+•]|\d+\.)\s+(.+)$/)
+    if (m && m[1]) {
+      const item = m[1].trim()
+      if (item) bullets.push(item)
+    }
+  }
+  return bullets
+}
+
+const props = withDefaults(defineProps<{
+  /** 控制卡片显隐。默认：true */
+  visible?: boolean
+  /** 显式版本号，如 "v1.2.0" */
+  version?: string | null
+  /** 版本发布日期，如 "2026-10-18" */
+  date?: string | null
+  /** 更新日志正文（Markdown 字符串）。若未显式指定 bulletPoints，将自动提炼其中的列表项 */
+  content?: string | null
+  /** 手工指定的更新要点列表 */
+  bulletPoints?: string[]
+  /** 最多展示的 bullet 要点条数。默认：4 */
+  maxBullets?: number
+  /** 卡片标题。默认："✨ 新版本上线" */
+  title?: string
+  /** "查看完整更新日志 / 查看更多" 的外链 URL 或跳转目标。若传入则显示查看更多链接 */
+  viewMoreUrl?: string
+  /** "查看更多" 按钮或链接文案。默认："查看完整更新日志" */
+  viewMoreText?: string
+  /** "立即刷新" 按钮文案。默认："立即刷新" */
+  refreshText?: string
+  /** 是否允许关闭/暂不更新。默认：true */
+  closable?: boolean
+  /** 卡片布局：'floating'（右下角浮动卡片）或 'inline'（流式嵌入）。默认：'floating' */
+  layout?: 'floating' | 'inline'
+  /** 显式指定深色/浅色外观。null/undefined 则跟随系统的 prefers-color-scheme */
+  dark?: boolean | null
+}>(), {
   visible: true,
   version: null,
   date: null,
@@ -39,7 +79,7 @@ const bullets = computed(() => {
     return props.bulletPoints
   }
   if (props.content) {
-    return extractBulletPoints(props.content)
+    return parseBulletPoints(props.content)
   }
   return []
 })
