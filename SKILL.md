@@ -1,6 +1,6 @@
 ---
 name: refresh-guard
-description: "vite-plugin-refresh-guard 的 agent 接入手册。给 Vite 前端项目加'检测新版本部署→通知→刷新'机制，三档强度可选（静默自动刷新 / toast提示+短延迟自动刷新 / 弹窗阻断必须手动点击），核心逻辑框架无关，Vue/React 各有一份薄适配层，另附一个独立可选的 CHANGELOG.md 展示层。在 Vite 项目里需要处理'部署新版本后用户还在用旧代码/旧chunk 404 白屏'问题，或者想把项目里手写的一次性 version-check 脚本换成可维护的通用方案时用这个。"
+description: "vite-plugin-refresh-guard 的 agent 接入手册。给 Vite 前端项目加'检测新版本部署→通知→刷新'机制，三档强度可选（静默自动刷新 / toast提示+短延迟自动刷新 / 弹窗阻断必须手动点击），核心逻辑框架无关，Vue/React 各有一份薄适配层，另附全量/最新 CHANGELOG 虚拟模块、运行时拉取模式与开箱即用的新功能卡片组件 UpdateCard。在 Vite 项目里需要处理'部署新版本后用户还在用旧代码/旧chunk 404 白屏'问题，或者想把项目里手写的一次性 version-check 脚本换成可维护的通用方案时用这个。"
 version: 0.1.0
 ---
 
@@ -47,6 +47,7 @@ export default defineConfig({ plugins: [refreshGuard()] })
 - **不要**在 `mode: 'modal-blocking'` 的弹窗外面又加一个背景点击关闭——设计上就是不可关闭的，加了等于白做这一档
 - **不要**绕开 `checker.applyUpdate()` 直接手写 `location.reload()`——会跳过 `refreshCooldown` 防抖，遇到 `version.json` 缓存配置有问题时容易刷新死循环
 - **不要**把"版本更新提示"和"CHANGELOG 展示"强行绑死成一套逻辑——这俩是两码事（一个决定"要不要刷新"，一个决定"给用户看什么"），本包故意拆成独立的 `virtual:refresh-guard-changelog` 虚拟模块，各用各的，不想要 changelog 就在插件配置里 `changelog: false`
+- 如果想要更丰富的"功能更新卡片"（含版本号、自动从 Markdown 提取要点、一键刷新与完整日志外链），直接引入 `UpdateCard`（`vite-plugin-refresh-guard/vue/UpdateCard.vue` 或 `vite-plugin-refresh-guard/react/UpdateCard`），不要手写一套卡片弹窗
 - 项目里如果已经有 `vite-plugin-pwa` 的 `autoUpdate` 在跑，别再叠加本包的 `interval` 轮询去做同一件"静默刷新"的事——两套机制同时静默触发过，历史上就出过"到底是谁刷新的"排查不清的问题，选一个就好
 
 ## 参考实现来源

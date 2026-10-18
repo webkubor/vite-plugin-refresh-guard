@@ -97,4 +97,44 @@ describe('UpdateChecker', () => {
     const checker = new UpdateChecker('1.0.0')
     await expect(checker.checkNow()).resolves.toBe(false)
   })
+
+  it('fetchChangelog 拉取并解析静态 CHANGELOG 文件', async () => {
+    const rawMd = '# Changelog\n\n## v2.1.0 (2026-10-18)\n\n- Fix issue\n'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => rawMd,
+    }))
+    const { fetchChangelog } = await import('../src/core/changelog')
+    const parsed = await fetchChangelog('/CHANGELOG.md')
+    expect(parsed.latestVersion).toBe('v2.1.0')
+    expect(parsed.allVersions).toHaveLength(1)
+    expect(parsed.allVersions[0].content).toBe('- Fix issue')
+  })
+
+  it('UpdateChecker 配置 changelog: { mode: "fetch" } 时，检测到更新自动触发 fetchChangelog 并派发事件', async () => {
+    const rawMd = '# Changelog\n\n## v2.0.0 (2026-10-18)\n\n- Feature X\n'
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (typeof url === 'string' && url.includes('version.json')) {
+        return { ok: true, json: async () => ({ version: '2.0.0' }) }
+      }
+      return { ok: true, text: async () => rawMd }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const changelogListener = vi.fn()
+    const checker = new UpdateChecker('1.0.0', {
+      mode: 'modal-blocking',
+      changelog: { mode: 'fetch', url: '/CHANGELOG.md' },
+    })
+    checker.on('changelog-loaded', changelogListener)
+
+    await checker.checkNow()
+    expect(checker.hasUpdate).toBe(true)
+
+    await vi.waitFor(() => {
+      expect(checker.changelog).toBeTruthy()
+      expect(checker.changelog?.latestVersion).toBe('v2.0.0')
+      expect(changelogListener).toHaveBeenCalledWith(expect.objectContaining({ latestVersion: 'v2.0.0' }))
+    })
+  })
 })

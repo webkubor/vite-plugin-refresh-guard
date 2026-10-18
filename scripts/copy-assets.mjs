@@ -6,6 +6,7 @@ import { dirname } from 'node:path'
 
 const copies = [
   ['src/vue/UpdatePrompt.vue', 'dist/vue/UpdatePrompt.vue'],
+  ['src/vue/UpdateCard.vue', 'dist/vue/UpdateCard.vue'],
   ['src/client.d.ts', 'dist/client.d.ts'],
 ]
 

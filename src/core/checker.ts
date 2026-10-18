@@ -1,4 +1,8 @@
-import type { UpdateEvent, UpdateListener, VersionCheckerOptions, VersionInfo } from './types'
+import type { UpdateEvent, UpdateListener, VersionCheckerOptions, VersionInfo, ParsedChangelog } from './types'
+import { fetchChangelog, parseChangelog, extractBulletPoints } from './changelog'
+
+export { fetchChangelog, parseChangelog, extractBulletPoints }
+export type { ParsedChangelog, ChangelogVersionEntry } from './changelog'
 
 const DEFAULTS: Required<Pick<VersionCheckerOptions,
   'versionUrl' | 'interval' | 'checkOnVisible' | 'mode' | 'autoRefreshDelay' | 'refreshCooldown' | 'guardChunkErrors'
@@ -34,6 +38,7 @@ export class UpdateChecker {
   private listeners = new Map<UpdateEvent, Set<UpdateListener>>()
   private _hasUpdate = false
   private _latestInfo: VersionInfo | null = null
+  private _changelog: ParsedChangelog | null = null
   private visibilityHandler = () => {
     if (document.visibilityState === 'visible') void this.checkNow()
   }
@@ -53,6 +58,28 @@ export class UpdateChecker {
 
   get hasUpdate() { return this._hasUpdate }
   get latestInfo() { return this._latestInfo }
+  get changelog() { return this._changelog }
+
+  /**
+   * 运行时拉取并解析 CHANGELOG 文件。
+   * 若配置了 `changelog: { mode: 'fetch', url: '...' }`，在发现新版本时会自动触发；
+   * 业务层也可主动调用此方法拉取完整历史日志列表。
+   */
+  async fetchChangelog(customUrl?: string): Promise<ParsedChangelog> {
+    const rawOpt = this.opts.changelog
+    let url = '/CHANGELOG.md'
+    if (customUrl) {
+      url = customUrl
+    } else if (typeof rawOpt === 'string') {
+      url = rawOpt
+    } else if (rawOpt && typeof rawOpt === 'object' && rawOpt.url) {
+      url = rawOpt.url
+    }
+    const result = await fetchChangelog(url)
+    this._changelog = result
+    this.emit('changelog-loaded', result)
+    return result
+  }
 
   start() {
     if (typeof window === 'undefined') return // no-op during SSR
@@ -103,6 +130,17 @@ export class UpdateChecker {
     if (this._hasUpdate) return // already surfaced, don't re-trigger toasts/timers
     this._hasUpdate = true
     this._latestInfo = info
+
+    // 若配置了运行时 fetch changelog，自动异步拉取
+    const rawChangelog = this.opts.changelog
+    const shouldFetch = rawChangelog && (
+      typeof rawChangelog === 'string' ||
+      (typeof rawChangelog === 'object' && rawChangelog.mode === 'fetch')
+    )
+    if (shouldFetch) {
+      void this.fetchChangelog()
+    }
+
     const suppress = this.opts.onUpdateAvailable?.(info) === false
     this.emit('update-available', info)
     if (suppress) return
@@ -132,7 +170,7 @@ export class UpdateChecker {
     return () => this.listeners.get(event)?.delete(listener)
   }
 
-  private emit(event: UpdateEvent, info: VersionInfo | null) {
-    this.listeners.get(event)?.forEach(cb => cb(info))
+  private emit(event: UpdateEvent, data: any) {
+    this.listeners.get(event)?.forEach(cb => cb(data))
   }
 }

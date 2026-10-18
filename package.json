@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-refresh-guard",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "$schema": "https://raw.githubusercontent.com/vitejs/vite-plugin-registry/refs/heads/main/data/schema/extended-package-json.schema.json",
   "description": "Vite plugin for web update notification — detect a new version on every page load and prompt users to reload: silent auto reload, force refresh, toast prompt, or blocking modal. Framework-agnostic core with Vue and React adapters. Vite 应用版本更新检测与自动刷新方案。",
   "type": "module",
@@ -41,6 +41,7 @@
       "import": "./dist/vue/useVersionCheck.js"
     },
     "./vue/UpdatePrompt.vue": "./dist/vue/UpdatePrompt.vue",
+    "./vue/UpdateCard.vue": "./dist/vue/UpdateCard.vue",
     "./react": {
       "types": "./dist/react/useVersionCheck.d.ts",
       "import": "./dist/react/useVersionCheck.js"
@@ -48,6 +49,10 @@
     "./react/UpdatePrompt": {
       "types": "./dist/react/UpdatePrompt.d.ts",
       "import": "./dist/react/UpdatePrompt.js"
+    },
+    "./react/UpdateCard": {
+      "types": "./dist/react/UpdateCard.d.ts",
+      "import": "./dist/react/UpdateCard.js"
     }
   },
   "files": [
@@ -57,7 +62,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/vue/useVersionCheck.ts src/react/useVersionCheck.ts src/react/UpdatePrompt.tsx --format esm --clean && tsc -p tsconfig.build.json && node scripts/copy-assets.mjs",
+    "build": "tsup src/index.ts src/vue/useVersionCheck.ts src/react/useVersionCheck.ts src/react/UpdatePrompt.tsx src/react/UpdateCard.tsx --format esm --clean && tsc -p tsconfig.build.json && node scripts/copy-assets.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "compat": "npm run typecheck && npm test && npm run build",

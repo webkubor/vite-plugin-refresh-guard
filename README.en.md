@@ -128,6 +128,7 @@ interface VersionCheckerOptions {
   autoRefreshDelay?: number    // toast-auto only, default 1200ms
   refreshCooldown?: number     // min ms between forced refreshes, default 90s — guards against reload loops
   guardChunkErrors?: boolean   // force-refresh once on a stale-chunk load failure, default true
+  changelog?: string | boolean | { mode?: 'bake' | 'fetch', url?: string } // runtime changelog options
   onUpdateAvailable?: (info) => void | boolean // return false to take over the UI yourself
   onBeforeRefresh?: () => void // flush analytics etc. right before location.reload()
 }
@@ -140,22 +141,75 @@ interface RefreshGuardPluginOptions {
   version?: string        // default: read from package.json
   includeCommit?: boolean // default true; silently omitted outside a git repo
   outFile?: string        // default 'version.json'
-  changelog?: string | false // default 'CHANGELOG.md'; false disables the virtual module
+  changelog?: string | false | {
+    mode?: 'bake' | 'fetch' // 'bake' bakes into virtual module (default); 'fetch' copies to dist for runtime fetch
+    file?: string           // local changelog file path, default 'CHANGELOG.md'
+    outFile?: string        // output filename in dist, default 'CHANGELOG.md'
+    url?: string            // runtime fetch URL, default '/CHANGELOG.md'
+  }
 }
 ```
 
-## Changelog display (optional, decoupled from the refresh decision)
+## Changelog Display (Full export and Runtime fetch)
 
 ```ts
-import { latestVersion, latestContent } from 'virtual:refresh-guard-changelog'
+import { latestVersion, latestContent, allVersions } from 'virtual:refresh-guard-changelog'
 ```
 
-Parses `## vX.Y.Z (date)` headings (same format as Keep a Changelog / most auto-generated
-changelogs) out of your `CHANGELOG.md` and exposes the latest section's version and markdown
-body. This is independent of the refresh-trigger logic on purpose — showing "what's new" and
-deciding "when do we reload" are different product decisions, and coupling them (as several
-of the projects this package was extracted from originally did) is how you end up with two
-mechanisms fighting each other.
+- **Latest & Full History**: `latestVersion` and `latestContent` provide the newest version title and markdown body; `allVersions: Array<{ version, date, content }>` parses all historical version sections, enabling in-app changelog centers without custom backend APIs.
+- **Runtime Fetch Mode**: Configure `refreshGuard({ changelog: { mode: 'fetch' } })` to emit `dist/CHANGELOG.md` at build time. The client can automatically fetch and parse updates at runtime (`useVersionCheck` exposes `changelog` and `fetchChangelog()`).
+- **Bullet Extraction Utility**: `extractBulletPoints(markdown)` automatically extracts list items from markdown text.
+
+## Feature Notification Card (UpdateCard)
+
+Need a rich feature notification card instead of a plain toast notice? Drop in `UpdateCard`:
+
+- **Auto Bullet Extraction**: Automatically parses list items (`- `, `* `, `1. `) from Markdown content into clean bullet points.
+- **Dual Layout**: `layout="floating"` for a smooth slide-in bottom-right notification card, or `layout="inline"` to embed in a dashboard/header.
+- **Interactive**: Version badge, release date, max item truncation (with "+N more improvements"), one-click refresh button, and "view full changelog" link.
+
+**Vue**
+
+```vue
+<script setup lang="ts">
+import { useVersionCheck } from 'vite-plugin-refresh-guard/vue'
+import UpdateCard from 'vite-plugin-refresh-guard/vue/UpdateCard.vue'
+import { latestContent, latestVersion } from 'virtual:refresh-guard-changelog'
+
+const { hasUpdate, latestInfo, applyUpdate } = useVersionCheck(__REFRESH_GUARD_VERSION__)
+</script>
+
+<template>
+  <UpdateCard
+    :visible="hasUpdate"
+    :version="latestInfo?.version || latestVersion"
+    :content="latestContent"
+    view-more-url="/#/changelog"
+    @refresh="applyUpdate"
+  />
+</template>
+```
+
+**React**
+
+```tsx
+import { useVersionCheck } from 'vite-plugin-refresh-guard/react'
+import { UpdateCard } from 'vite-plugin-refresh-guard/react/UpdateCard'
+import { latestContent } from 'virtual:refresh-guard-changelog'
+
+function App() {
+  const { hasUpdate, latestInfo, applyUpdate } = useVersionCheck(__REFRESH_GUARD_VERSION__)
+  return (
+    <UpdateCard
+      visible={hasUpdate}
+      version={latestInfo?.version}
+      content={latestContent}
+      viewMoreUrl="/#/changelog"
+      onRefresh={applyUpdate}
+    />
+  )
+}
+```
 
 ## Styling
 

@@ -142,6 +142,7 @@ interface VersionCheckerOptions {
   autoRefreshDelay?: number    // 仅 toast-auto 用，默认 1200ms
   refreshCooldown?: number     // 两次强制刷新之间的最短间隔，默认 90 秒——防止刷新死循环
   guardChunkErrors?: boolean   // 旧 chunk 加载失败时强刷一次，默认 true
+  changelog?: string | boolean | { mode?: 'bake' | 'fetch', url?: string } // 运行时拉取 changelog
   onUpdateAvailable?: (info) => void | boolean // 返回 false 可以自己接管 UI
   onBeforeRefresh?: () => void // 真正 location.reload() 前调用，适合在这里补埋点
 }
@@ -154,17 +155,75 @@ interface RefreshGuardPluginOptions {
   version?: string        // 默认读 package.json
   includeCommit?: boolean // 默认 true；非 git 仓库时静默省略，不报错
   outFile?: string        // 默认 'version.json'
-  changelog?: string | false // 默认 'CHANGELOG.md'；false 关闭虚拟模块
+  changelog?: string | false | {
+    mode?: 'bake' | 'fetch' // 'bake' 构建期烘焙进虚拟模块（默认）；'fetch' 复制到 dist 供运行时拉取
+    file?: string           // 本地 CHANGELOG 路径，默认 'CHANGELOG.md'
+    outFile?: string        // 产物文件名，默认 'CHANGELOG.md'
+    url?: string            // 运行时拉取 URL，默认 '/CHANGELOG.md'
+  }
 }
 ```
 
-## 更新日志展示（可选，跟"要不要刷新"这个决定解耦）
+## 更新日志展示（全量导出与运行时拉取）
 
 ```ts
-import { latestVersion, latestContent } from 'virtual:refresh-guard-changelog'
+import { latestVersion, latestContent, allVersions } from 'virtual:refresh-guard-changelog'
 ```
 
-从你的 `CHANGELOG.md` 里解析 `## vX.Y.Z (date)` 这种格式的标题（跟 Keep a Changelog 及大多数自动生成的更新日志一致），暴露最新一条的版本号和 markdown 正文。这个功能故意跟"什么时候刷新"的逻辑解耦——"展示更新了什么"和"什么时候该刷新"是两个不同的产品决策，本包最初就是从几个把这两件事强行绑死在一起的项目里抽出来的，绑死的下场就是两套机制互相打架。
+- **最新版与历史全量**：`latestVersion` 与 `latestContent` 提供最新版本的版本号与正文；`allVersions: Array<{ version, date, content }>` 解析了 `CHANGELOG.md` 中所有历史版本块，前端更新中心/日志大盘页面可直接渲染，无需后端写文件读取接口。
+- **运行时动态拉取模式**：配置 `refreshGuard({ changelog: { mode: 'fetch' } })`，构建时自动把 CHANGELOG 写入 `dist`。客户端可在检测到更新时自动拉取最新静态文件（`useVersionCheck` 返回的 `changelog` 对象与 `fetchChangelog()` 方法），服务器只需同步静态 markdown，无需重复构建。
+- **要点提取工具**：导出纯函数 `extractBulletPoints(markdown)`，自动从正文中提炼列表项。
+
+## 新功能通知卡片组件（UpdateCard）
+
+想要更丰富的"功能更新卡片"而不是简单的文字提示条？引入 `UpdateCard`，开箱即用：
+
+- **自动要点提炼**：自动识别并提取 Markdown 正文中的更新条目（`- ` / `* ` / `1. ` 等），以整洁的 Bullet 列表展示。
+- **双布局支持**：默认 `layout="floating"` 右下角平滑滑入浮动卡片；也可设为 `layout="inline"` 嵌入到仪表盘或大盘通知栏。
+- **闭环交互**：带版本号与发布日期徽标、最多展示条数限制（超出提示 "+N 项更多改进"）、一键刷新按钮与"查看完整更新日志"跳转外链。
+
+**Vue**
+
+```vue
+<script setup lang="ts">
+import { useVersionCheck } from 'vite-plugin-refresh-guard/vue'
+import UpdateCard from 'vite-plugin-refresh-guard/vue/UpdateCard.vue'
+import { latestContent, latestVersion } from 'virtual:refresh-guard-changelog'
+
+const { hasUpdate, latestInfo, applyUpdate } = useVersionCheck(__REFRESH_GUARD_VERSION__)
+</script>
+
+<template>
+  <UpdateCard
+    :visible="hasUpdate"
+    :version="latestInfo?.version || latestVersion"
+    :content="latestContent"
+    view-more-url="/#/changelog"
+    @refresh="applyUpdate"
+  />
+</template>
+```
+
+**React**
+
+```tsx
+import { useVersionCheck } from 'vite-plugin-refresh-guard/react'
+import { UpdateCard } from 'vite-plugin-refresh-guard/react/UpdateCard'
+import { latestContent } from 'virtual:refresh-guard-changelog'
+
+function App() {
+  const { hasUpdate, latestInfo, applyUpdate } = useVersionCheck(__REFRESH_GUARD_VERSION__)
+  return (
+    <UpdateCard
+      visible={hasUpdate}
+      version={latestInfo?.version}
+      content={latestContent}
+      viewMoreUrl="/#/changelog"
+      onRefresh={applyUpdate}
+    />
+  )
+}
+```
 
 ## 样式定制
 

@@ -1,5 +1,18 @@
 # 更新日志
 
+## v0.3.0 (2026-10-18)
+
+- **全量更新日志导出 (`allVersions`)**：
+  虚拟模块 `virtual:refresh-guard-changelog` 除了 `latestVersion`/`latestContent` 外，新增 `allVersions: Array<{ version: string, date: string | null, content: string }>`。前端站内更新中心可直接引用，无需自写后端接口读盘。
+  解析器兼容主流 Keep a Changelog 格式：`## [1.2.0] - 2026-10-18`、`## v1.2.0 (2026-10-18)`、`## 1.2.0`。
+- **静态 CHANGELOG 运行时拉取模式 (`mode: 'fetch'`)**：
+  插件配置支持 `changelog: { mode: 'fetch', outFile?: string, url?: string }`，构建时自动将本地 CHANGELOG 写入 `dist` 静态资源目录。
+  运行时 `UpdateChecker` 及 `useVersionCheck` 支持 `changelog: { mode: 'fetch', url: '/CHANGELOG.md' }`，在发现新版本时自动异步 fetch 并解析，触发 `changelog-loaded` 事件，状态暴露于 `checker.changelog`。
+  导出通用纯函数 `parseChangelog`、`extractBulletPoints` 与 `fetchChangelog`。
+- **新版本功能通知卡片组件 (`UpdateCard`)**：
+  新增开箱即用的新功能概览卡片，提供 Vue (`vite-plugin-refresh-guard/vue/UpdateCard.vue`) 与 React (`vite-plugin-refresh-guard/react/UpdateCard`) 原生支持。
+  自动从 Markdown 正文提取列表要点（bullet points）；支持版本徽标、日期展示、最大条数限制（超出折叠并提示 "+N 项更多改进"）、一键刷新与查看完整日志链接；支持浮动（floating）与行内嵌入（inline）双布局及深浅色主题自适应。
+
 ## v0.2.2 (2026-10-09)
 
 **只动 npm 元数据，一行运行期代码没改** —— 目的是让插件在「版本更新提示」这个品类里被搜到。

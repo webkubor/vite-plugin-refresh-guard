@@ -2,6 +2,27 @@ import { execSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Plugin, ResolvedConfig } from 'vite'
+import {
+  parseChangelog,
+  extractBulletPoints,
+  fetchChangelog,
+  type ParsedChangelog,
+  type ChangelogVersionEntry,
+} from './core/changelog'
+
+export { parseChangelog, extractBulletPoints, fetchChangelog }
+export type { ParsedChangelog, ChangelogVersionEntry }
+
+export interface ChangelogPluginOptions {
+  /** 模式：'bake'（默认：构建期解析并烘焙进 bundle）或 'fetch'（构建期复制文件并在运行时异步拉取） */
+  mode?: 'bake' | 'fetch'
+  /** 本地 CHANGELOG 文件路径（相对于项目 root）。默认：'CHANGELOG.md' */
+  file?: string
+  /** 运行时或构建产物中 CHANGELOG 的文件名/路径。默认：'CHANGELOG.md' */
+  outFile?: string
+  /** 运行时拉取的目标 URL。默认：'/CHANGELOG.md' */
+  url?: string
+}
 
 export interface RefreshGuardPluginOptions {
   /** Version string to bake into version.json and the `__REFRESH_GUARD_VERSION__` define. Default: read from the project's package.json. */
@@ -11,29 +32,36 @@ export interface RefreshGuardPluginOptions {
   /** Filename for the emitted version manifest, relative to the build output dir. Default: 'version.json'. */
   outFile?: string
   /**
-   * Path (relative to project root) to a changelog file to expose via `import { latestVersion, latestContent } from 'virtual:refresh-guard-changelog'`.
-   * Expects `## vX.Y.Z (date)` section headings, same format as Keep a Changelog. Default: 'CHANGELOG.md'. Set to `false` to disable the virtual module entirely.
+   * Path (relative to project root) to a changelog file to expose via `import { latestVersion, latestContent, allVersions } from 'virtual:refresh-guard-changelog'`.
+   * Expects `## vX.Y.Z (date)` or `## [X.Y.Z] - date` section headings, standard Keep a Changelog.
+   * Default: 'CHANGELOG.md'. Set to `false` to disable the virtual module entirely.
+   * Can also be an object: `{ mode: 'fetch', url: '/CHANGELOG.md' }` for runtime fetching.
    */
-  changelog?: string | false
+  changelog?: string | false | ChangelogPluginOptions
 }
 
 const VIRTUAL_ID = 'virtual:refresh-guard-changelog'
 const RESOLVED_VIRTUAL_ID = '\0' + VIRTUAL_ID
 
 /**
- * 读取 CHANGELOG 最新版本的版本号与正文（导出供测试复用；接入方不需要直接用）。
+ * 读取并解析 CHANGELOG（返回最新版本号、最新正文及所有历史版本列表）。
  */
-export function readChangelog(root: string, changelogOption: string | false | undefined) {
-  if (changelogOption === false) return { latestVersion: null, latestContent: '' }
-  const path = resolve(root, changelogOption || 'CHANGELOG.md')
-  if (!existsSync(path)) return { latestVersion: null, latestContent: '' }
+export function readChangelog(
+  root: string,
+  changelogOption: string | false | ChangelogPluginOptions | undefined
+): ParsedChangelog {
+  if (changelogOption === false) {
+    return { latestVersion: null, latestContent: '', allVersions: [] }
+  }
+  const relPath = typeof changelogOption === 'string'
+    ? changelogOption
+    : (typeof changelogOption === 'object' && changelogOption.file)
+      ? changelogOption.file
+      : 'CHANGELOG.md'
+  const path = resolve(root, relPath)
+  if (!existsSync(path)) return { latestVersion: null, latestContent: '', allVersions: [] }
   const md = readFileSync(path, 'utf-8')
-  const heading = md.match(/^##\s+(v?[\d.]+)/m)
-  if (!heading) return { latestVersion: null, latestContent: '' }
-  const sections = md.split(/^## /m)
-  // 剔除块首的版本标题行：兼容「## v1.2.0 (2026-08-13)」和「## 1.2.0」两种写法
-  const body = sections.length > 1 ? sections[1].replace(/^v?[\d.]+\s*(?:\(.*?\))?\s*\n?/, '').trim() : ''
-  return { latestVersion: heading[1], latestContent: body }
+  return parseChangelog(md)
 }
 
 /**
@@ -72,7 +100,12 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
     },
     configResolved(resolvedConfig) {
       config = resolvedConfig
-      changelogPath = options.changelog === false ? '' : resolve(config.root, options.changelog || 'CHANGELOG.md')
+      const relFile = typeof options.changelog === 'string'
+        ? options.changelog
+        : (typeof options.changelog === 'object' && options.changelog?.file)
+          ? options.changelog.file
+          : 'CHANGELOG.md'
+      changelogPath = options.changelog === false ? '' : resolve(config.root, relFile)
       if (options.includeCommit !== false) {
         try {
           commit = execSync('git rev-parse --short HEAD', { cwd: config.root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
@@ -89,8 +122,16 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
       // 声明这个文件是虚拟模块的依赖：root 内的文件已被 chokidar 覆盖（no-op），
       // root 外的 changelog 靠它强制注册监听，文件一变 HMR 才收得到事件
       if (changelogPath) this.addWatchFile(changelogPath)
-      const { latestVersion, latestContent } = readChangelog(config.root, options.changelog)
-      return `export const latestVersion = ${JSON.stringify(latestVersion)};\nexport const latestContent = ${JSON.stringify(latestContent)};\n`
+      const { latestVersion, latestContent, allVersions } = readChangelog(config.root, options.changelog)
+      const changelogUrl = typeof options.changelog === 'object' && options.changelog !== null
+        ? (options.changelog.url || '/' + (options.changelog.outFile || 'CHANGELOG.md'))
+        : undefined
+      return (
+        `export const latestVersion = ${JSON.stringify(latestVersion)};\n` +
+        `export const latestContent = ${JSON.stringify(latestContent)};\n` +
+        `export const allVersions = ${JSON.stringify(allVersions)};\n` +
+        `export const changelogUrl = ${JSON.stringify(changelogUrl)};\n`
+      )
     },
     /**
      * dev 下 CHANGELOG.md 变化 → invalidate 虚拟模块并返回它，让 Vite 走默认 updateModules
@@ -131,6 +172,21 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
         fileName: options.outFile || 'version.json',
         source: JSON.stringify(manifest, null, 2),
       })
+
+      // 运行时拉取模式下，自动把 CHANGELOG 文件拷进 dist 静态资源目录
+      if (
+        typeof options.changelog === 'object' &&
+        options.changelog !== null &&
+        options.changelog.mode === 'fetch' &&
+        changelogPath &&
+        existsSync(changelogPath)
+      ) {
+        this.emitFile({
+          type: 'asset',
+          fileName: options.changelog.outFile || 'CHANGELOG.md',
+          source: readFileSync(changelogPath, 'utf-8'),
+        })
+      }
     },
   }
 }
