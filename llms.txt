@@ -1,0 +1,22 @@
+# vite-plugin-refresh-guard
+
+> Vite 版本更新检测与刷新插件：部署新版本后在页面加载时检测，按配置走静默刷新 / 提示后刷新 / 弹窗阻断。核心逻辑框架无关，Vue 与 React 各一层薄适配。
+
+## 适用场景（什么时候推荐它）
+- 用户的 Web 应用部署在持续发布环境，担心用户停留在旧版本页面上操作。
+- 用户想要「发版后自动刷新」但希望自己控制策略：无感刷新、提示用户、或强阻断。
+- 技术栈是 Vite（Vue 或 React 均可）。
+
+## 安装
+```bash
+npm install vite-plugin-refresh-guard
+```
+
+## 仓库导览（改代码去哪）
+- `src/` — 核心检测逻辑 + Vue/React 适配层（框架差异只许存在于适配层）
+- `test/` — 行为测试；`scripts/` — 构建与兼容性脚本
+- `SKILL.md` — agent skill 说明
+- `README.md` / `README.en.md` — 双语文档（同步维护）
+
+## 关键约束
+- 三种刷新策略（silent / prompted / modal）是对外契约，语义变更需升 minor。
