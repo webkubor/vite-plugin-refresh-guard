@@ -1,7 +1,7 @@
 ---
 name: refresh-guard
 description: "vite-plugin-refresh-guard 的 agent 接入手册。给 Vite 前端项目加'检测新版本部署→通知→刷新'机制，三档强度可选（静默自动刷新 / toast提示+短延迟自动刷新 / 弹窗阻断必须手动点击），核心逻辑框架无关，Vue/React 各有一份薄适配层，另附全量/最新 CHANGELOG 虚拟模块、运行时拉取模式与开箱即用的新功能卡片组件 UpdateCard。在 Vite 项目里需要处理'部署新版本后用户还在用旧代码/旧chunk 404 白屏'问题，或者想把项目里手写的一次性 version-check 脚本换成可维护的通用方案时用这个。"
-version: 0.1.0
+version: 0.3.1
 ---
 
 # vite-plugin-refresh-guard
