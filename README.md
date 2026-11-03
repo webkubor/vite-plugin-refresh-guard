@@ -47,6 +47,39 @@ npm i -D vite-plugin-refresh-guard
 
 `vue`、`react`/`react-dom`、`vite` 都是 peerDependency——用哪个装哪个。
 
+## 最小示例
+
+只想"部署新版本后自动刷到新代码"、不要任何 UI？三个文件就够（以 Vue 为例）：
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { refreshGuard } from 'vite-plugin-refresh-guard'
+
+export default defineConfig({
+  plugins: [vue(), refreshGuard()],
+})
+```
+
+```ts
+// env.d.ts
+/// <reference types="vite-plugin-refresh-guard/client" />
+```
+
+```vue
+<!-- App.vue -->
+<script setup lang="ts">
+import { useVersionCheck } from 'vite-plugin-refresh-guard/vue'
+
+useVersionCheck(__REFRESH_GUARD_VERSION__, { mode: 'silent' })
+</script>
+```
+
+`silent` 档检测到新版本会直接刷新，不需要挂任何组件。React 同理：在根组件里调用 `vite-plugin-refresh-guard/react` 导出的 `useVersionCheck(__REFRESH_GUARD_VERSION__, { mode: 'silent' })`。
+
+`version.json` 只在 `vite build` 时生成，用 `vite preview` 或任意静态服务器访问构建产物即可验证。想要提示条或弹窗，往下看「快速开始」。
+
 ## 快速开始
 
 **`vite.config.ts`**
