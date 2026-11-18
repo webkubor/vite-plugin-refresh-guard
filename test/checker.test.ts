@@ -98,6 +98,43 @@ describe('UpdateChecker', () => {
     await expect(checker.checkNow()).resolves.toBe(false)
   })
 
+  it('buildId 优先：version 没变但部署变了，也必须检测到（忘了 bump package.json 的场景）', async () => {
+    mockFetchOnce({ version: '1.0.0', buildId: 'abc1234' })
+    const checker = new UpdateChecker('1.0.0', { mode: 'modal-blocking', buildId: 'def5678' })
+    await expect(checker.checkNow()).resolves.toBe(true)
+    expect(checker.latestInfo?.buildId).toBe('abc1234')
+  })
+
+  it('buildId 相同即同一部署，不触发（哪怕 version 字段被改过）', async () => {
+    mockFetchOnce({ version: '9.9.9', buildId: 'abc1234' })
+    const checker = new UpdateChecker('1.0.0', { mode: 'silent', buildId: 'abc1234' })
+    await expect(checker.checkNow()).resolves.toBe(false)
+    expect(reloadSpy).not.toHaveBeenCalled()
+  })
+
+  it('version.json 没有 buildId 时回落比 version（兼容老部署/第三方 manifest）', async () => {
+    mockFetchOnce({ version: '2.0.0' })
+    const checker = new UpdateChecker('1.0.0', { mode: 'modal-blocking', buildId: 'abc1234' })
+    await expect(checker.checkNow()).resolves.toBe(true)
+  })
+
+  it('version.json 请求带 cache-buster —— no-store 管不到 CDN/反代的旧副本', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ version: '1.0.0' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const checker = new UpdateChecker('1.0.0')
+    await checker.checkNow()
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/version\.json\?t=\d+/)
+  })
+
+  it('refreshNow() 无视冷却 —— 用户显式点击不该是死按钮', () => {
+    const checker = new UpdateChecker('1.0.0', { mode: 'modal-blocking', refreshCooldown: 60_000 })
+    checker.applyUpdate() // 首次刷新，冷却开始
+    checker.applyUpdate() // 冷却内，自动路径被拦
+    expect(reloadSpy).toHaveBeenCalledTimes(1)
+    checker.refreshNow() // 显式点击穿透冷却
+    expect(reloadSpy).toHaveBeenCalledTimes(2)
+  })
+
   it('fetchChangelog 拉取并解析静态 CHANGELOG 文件', async () => {
     const rawMd = '# Changelog\n\n## v2.1.0 (2026-10-18)\n\n- Fix issue\n'
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

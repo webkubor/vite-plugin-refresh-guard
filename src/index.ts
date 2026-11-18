@@ -73,10 +73,24 @@ export function readChangelog(
  * since HMR already covers that case; point a static-file server or `vite preview` at the
  * build output to see it end to end.
  */
+/** Short git SHA of the checkout being built, or '' when git/the repo isn't available. */
+function readGitCommit(root: string): string {
+  try {
+    return execSync('git rev-parse --short HEAD', { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+  } catch {
+    return '' // not a git repo / git unavailable — callers fall back to a timestamp
+  }
+}
+
 export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
   let config: ResolvedConfig
   let version = options.version
-  const buildId = String(Date.now())
+  // Deployment identity, not a "release number": it answers "is the build I'm running still the
+  // one being served?". Derived from the commit so it's reproducible (same commit → same id) and
+  // greppable when debugging production. Timestamp is only the no-git fallback.
+  let buildId = ''
   let commit = ''
   // changelog 绝对路径（dev 下热更新要监听它）；changelog:false 时为空串
   let changelogPath = ''
@@ -96,7 +110,18 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
           version = '0.0.0'
         }
       }
-      return { define: { __REFRESH_GUARD_VERSION__: JSON.stringify(version) } }
+      // The client needs to know its own build id to compare against version.json — resolving it
+      // here (not in generateBundle) is what makes the `define` possible.
+      if (!buildId) {
+        commit = options.includeCommit === false ? '' : readGitCommit(root)
+        buildId = commit || String(Date.now())
+      }
+      return {
+        define: {
+          __REFRESH_GUARD_VERSION__: JSON.stringify(version),
+          __REFRESH_GUARD_BUILD_ID__: JSON.stringify(buildId),
+        },
+      }
     },
     configResolved(resolvedConfig) {
       config = resolvedConfig
@@ -106,12 +131,11 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
           ? options.changelog.file
           : 'CHANGELOG.md'
       changelogPath = options.changelog === false ? '' : resolve(config.root, relFile)
-      if (options.includeCommit !== false) {
-        try {
-          commit = execSync('git rev-parse --short HEAD', { cwd: config.root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
-        } catch {
-          commit = '' // not a git repo / git unavailable — version.json just omits it
-        }
+      // `config()` already resolved commit/buildId from `userConfig.root`; only retry when that
+      // root was absent or pointed somewhere gitless — the resolved root is the authoritative one.
+      if (!commit && options.includeCommit !== false) {
+        commit = readGitCommit(config.root)
+        if (commit && buildId !== commit) buildId = commit
       }
     },
     resolveId(id) {
@@ -163,7 +187,8 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
     generateBundle() {
       const manifest = {
         version: version ?? '0.0.0',
-        buildId,
+        // Only reachable without a prior config() pass (e.g. a hand-rolled pipeline).
+        buildId: buildId || String(Date.now()),
         commit: commit || undefined,
         time: new Date().toISOString(),
       }

@@ -200,4 +200,29 @@ describe('refreshGuard plugin with changelog options', () => {
       expect(changelogAsset.source).toContain('## v1.0.0 (2026-10-18)')
     }
   })
+
+  it('define 注入 buildId，且与 version.json 里的 buildId 一致（无 git 时回落时间戳）', async () => {
+    const { refreshGuard } = await import('../src/index.js')
+    const plugin = refreshGuard()
+    const emitted: any[] = []
+    const fakeContext = {
+      emitFile: (asset: any) => emitted.push(asset),
+      addWatchFile: () => {},
+    }
+
+    // tmpdir 不是 git 仓库 → 走 Date.now() 兜底，但 define 与产物必须同源
+    const returned = (plugin.config as any).call(
+      fakeContext,
+      { root: dir } as any,
+      { command: 'build', mode: 'production' },
+    ) as { define: Record<string, string> }
+    expect(returned.define.__REFRESH_GUARD_BUILD_ID__).toBeTruthy()
+
+    ;(plugin.configResolved as any).call(fakeContext, { root: dir } as any)
+    ;(plugin.generateBundle as any).call(fakeContext, {} as any, {} as any, false)
+
+    const manifest = JSON.parse(emitted.find(e => e.fileName === 'version.json').source)
+    expect(manifest.buildId).toBe(JSON.parse(returned.define.__REFRESH_GUARD_BUILD_ID__))
+    expect(manifest.buildId).not.toBe('')
+  })
 })

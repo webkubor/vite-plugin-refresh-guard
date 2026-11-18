@@ -1,5 +1,24 @@
 # 更新日志
 
+## v0.4.0 (2026-11-18)
+
+> **一句话摘要**：检测基准从 `version` 换成 `buildId`（部署身份）——忘 bump 版本号的连续发版、回滚部署，从此都看得见；同时修掉 CDN 缓存造成的假阴性，以及弹窗「立即刷新」在冷却期内的死按钮。
+
+### ✨ 行为变更 (Behavior)
+- **`buildId` 成为首选比对基准**：构建期取 git short SHA（无 git 环境回落时间戳），由插件 `define` 同时注入客户端（`__REFRESH_GUARD_BUILD_ID__`）与 `version.json`。运行时两侧都有 buildId 就比 buildId，否则回落比 `version`（老部署 / 第三方 manifest 不受影响）。
+  - 修的场景：CI 里 `package.json` 版本号连续几次发版都没动 → 旧行为完全检测不到更新，且表现为静默失效。
+  - 回滚部署同样能感知：version 比对在这个方向上最容易判错（旧 bundle 看到「更老的 version」反而当成新版本）。
+  - buildId 可复现：同一 commit 构建多次得到同一个值，线上排查能直接对回提交。
+- `UpdateChecker` 新增 `buildId` 选项；Vue/React 适配层透传，默认自动读注入值，**原调用代码无需改动**。
+
+### 🐛 缺陷修复 (Bug Fixes)
+- **`version.json` 请求带 cache-buster**：`cache: 'no-store'` 只绕过浏览器缓存，CDN / 反向代理 / Service Worker 仍可能一直回旧副本，导致永远检测不到更新。现在请求附带 `?t=<ts>`（`versionUrl` 已有查询串时用 `&` 拼接）。
+- **`modal-blocking` 的「立即刷新」在冷却期内是死按钮**：`applyUpdate()` 无条件受 `refreshCooldown` 约束，用户点击被静默吞掉。新增 `applyUpdate({ force: true })` 与 `refreshNow()`（两个适配层都暴露）。
+- **冷却写入时序自锁**：`sessionStorage` 时间戳原先写在 `onBeforeRefresh` 之前，回调抛错会留下「已冷却但没刷新、且冷却期内刷不了」的状态；改为在真正 `reload()` 前最后一步写入。
+
+### ⚠️ 破坏性变更与迁移 (Breaking Changes & Migration)
+- 无破坏性变更。对正常 bump 版本号的项目，行为等价；只有依赖「version 不变就不刷新」这一旧语义的用法，需要显式传 `buildId: ''` 退回按 version 比对。
+
 ## v0.3.1 (2026-10-18)
 
 - **组件依赖纯净化 (`UpdateCard.vue`)**：

@@ -73,6 +73,16 @@ export interface UpdateCardProps {
 export interface VersionCheckerOptions {
   /** Where to fetch version info from. Default: '/version.json' (see the Vite plugin, which emits this file at build time). */
   versionUrl?: string
+  /**
+   * Deployment id of *this* running build — usually left unset, in which case the value baked in
+   * by the plugin's `define` (`__REFRESH_GUARD_BUILD_ID__`) is used.
+   *
+   * When both this and the fetched manifest's `buildId` are present, they decide whether an
+   * update exists — not `version`. That's the difference between "a new release was published"
+   * and "the build I'm running is no longer the one being served": redeploys that kept the same
+   * package.json version are caught, and a rollback counts as a change too.
+   */
+  buildId?: string
   /** Poll interval in ms. Default: 5 minutes. Set to 0 to disable polling (e.g. if you only drive checks from a service-worker hook). */
   interval?: number
   /** Re-check when the tab becomes visible again after being hidden. Default: true. */

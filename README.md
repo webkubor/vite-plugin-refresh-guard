@@ -136,6 +136,7 @@ function App() {
 ```ts
 interface VersionCheckerOptions {
   versionUrl?: string          // 默认 '/version.json'
+  buildId?: string             // 本次构建的部署标识；默认取插件注入的 __REFRESH_GUARD_BUILD_ID__。比 version 更准，见下
   interval?: number            // 默认 5 分钟；设 0 关闭轮询
   checkOnVisible?: boolean     // 标签页重新可见时也查一次，默认 true
   mode?: 'silent' | 'toast-auto' | 'modal-blocking' // 默认 'toast-auto'
@@ -147,6 +148,10 @@ interface VersionCheckerOptions {
   onBeforeRefresh?: () => void // 真正 location.reload() 前调用，适合在这里补埋点
 }
 ```
+
+**检测基准是 `buildId`，不是 `version`。** 这两个问题不一样：`version` 回答"这是第几个发布"，`buildId` 回答"我手上这堆带 hash 的 JS/CSS，服务器上还是不是这一份"。忘 `bump` package.json 的连续发版、以及回滚部署，都只有 buildId 看得见——version 比对在这两种情况下是静默漏检，而静默正是最难被发现的那种 bug。
+
+`buildId` 默认取构建时的 git short SHA（无 git 环境回落时间戳），由插件的 `define` 同时注入产物与客户端，所以你不用手工传。只有手动构造 `UpdateChecker`、或想跨版本对齐时才需要显式指定；传空串则退回按 `version` 比对。
 
 插件配置（`refreshGuard({ ... })`）：
 

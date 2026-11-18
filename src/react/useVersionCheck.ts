@@ -59,7 +59,9 @@ export function useVersionCheck(currentVersion: string, options: VersionCheckerO
     latestInfo,
     changelog,
     mode: options.mode ?? 'toast-auto',
-    applyUpdate: () => checker.applyUpdate(),
+    applyUpdate: (opts?: { force?: boolean }) => checker.applyUpdate(opts),
+    /** Explicit "立即刷新" click — bypasses the refresh cooldown. Wire this to your button. */
+    refreshNow: () => checker.refreshNow(),
     checkNow: () => checker.checkNow(),
     fetchChangelog: (url?: string) => checker.fetchChangelog(url),
     /** Feed a vite-plugin-pwa `onNeedRefresh` (or any other out-of-band) signal into the same mode logic. */

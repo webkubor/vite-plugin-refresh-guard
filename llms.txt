@@ -20,3 +20,5 @@ npm install vite-plugin-refresh-guard
 
 ## 关键约束
 - 三种刷新策略（silent / prompted / modal）是对外契约，语义变更需升 minor。
+- 检测基准是 `buildId`（部署身份，默认取 git short SHA，由 `define` 注入产物与客户端），`version` 只在任一侧缺 buildId 时兜底。改判定逻辑时别只想着 version。
+- 用户显式点击刷新要走 `refreshNow()` / `applyUpdate({ force: true })`；`refreshCooldown`（默认 90s）只约束自动刷新路径。

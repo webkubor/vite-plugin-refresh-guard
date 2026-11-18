@@ -122,6 +122,7 @@ running a service worker and want its update event to drive the same toast/modal
 ```ts
 interface VersionCheckerOptions {
   versionUrl?: string          // default '/version.json'
+  buildId?: string             // this build's deployment id; defaults to the plugin-injected __REFRESH_GUARD_BUILD_ID__. See below
   interval?: number            // default 5 minutes; 0 disables polling
   checkOnVisible?: boolean     // re-check on tab focus, default true
   mode?: 'silent' | 'toast-auto' | 'modal-blocking' // default 'toast-auto'
@@ -133,6 +134,10 @@ interface VersionCheckerOptions {
   onBeforeRefresh?: () => void // flush analytics etc. right before location.reload()
 }
 ```
+
+**The comparison key is `buildId`, not `version`.** They answer different questions: `version` says "which release is this", `buildId` says "is the hashed JS/CSS I'm running still the set being served". Two deploys that never bumped package.json — and rollbacks — are visible only to the build id. A version compare misses them silently, and silent is exactly the failure nobody reports.
+
+`buildId` defaults to the git short SHA at build time (timestamp fallback without git) and is injected by the plugin's `define` into both the bundle and `version.json`, so you never pass it by hand. Pass it explicitly only when constructing `UpdateChecker` yourself or aligning ids across builds; an empty string opts back into version comparison.
 
 Plugin options (`refreshGuard({ ... })`):
 

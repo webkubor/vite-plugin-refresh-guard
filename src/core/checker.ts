@@ -17,6 +17,16 @@ const DEFAULTS: Required<Pick<VersionCheckerOptions,
 }
 
 const COOLDOWN_KEY = '__refresh_guard_last_refresh__'
+const CACHE_BUSTER = 't'
+
+/**
+ * The build id baked in by the plugin's `define`. Absent outside a Vite build (unit tests, SSR
+ * without the plugin, a hand-rolled setup), so `typeof` — not a bare reference — is required:
+ * an undeclared identifier would throw instead of reading as `undefined`.
+ */
+function readBakedBuildId(): string | undefined {
+  return typeof __REFRESH_GUARD_BUILD_ID__ !== 'undefined' ? __REFRESH_GUARD_BUILD_ID__ : undefined
+}
 
 // Matches Vite's own chunk-load failure signals: the `vite:preloadError` event it dispatches,
 // and the browser's rejection message when a dynamically-imported module 404s because a new
@@ -33,6 +43,7 @@ export class UpdateChecker {
     'versionUrl' | 'interval' | 'checkOnVisible' | 'mode' | 'autoRefreshDelay' | 'refreshCooldown' | 'guardChunkErrors'
   >> & VersionCheckerOptions
   private currentVersion: string
+  private buildId: string | undefined
   private timer: ReturnType<typeof setInterval> | null = null
   private autoRefreshTimer: ReturnType<typeof setTimeout> | null = null
   private listeners = new Map<UpdateEvent, Set<UpdateListener>>()
@@ -54,6 +65,8 @@ export class UpdateChecker {
   constructor(currentVersion: string, options: VersionCheckerOptions = {}) {
     this.currentVersion = currentVersion
     this.opts = { ...DEFAULTS, ...options }
+    // `??` not `||`: an empty-string buildId is a deliberate "compare by version instead".
+    this.buildId = options.buildId ?? readBakedBuildId()
   }
 
   get hasUpdate() { return this._hasUpdate }
@@ -103,17 +116,33 @@ export class UpdateChecker {
     window.removeEventListener('unhandledrejection', this.chunkErrorHandler)
   }
 
-  /** Fetch versionUrl now and react if it differs from the running build. Returns whether an update was found. */
+  /**
+   * Fetch versionUrl now and react if it differs from the running build. Returns whether an
+   * update was found.
+   *
+   * `cache: 'no-store'` only defeats the browser cache — a CDN or reverse proxy (or a service
+   * worker) in front of version.json can keep handing back a stale copy indefinitely, so the
+   * request also carries a cache-buster query.
+   */
   async checkNow(): Promise<boolean> {
     let info: VersionInfo
     try {
-      const resp = await fetch(this.opts.versionUrl, { cache: 'no-store' })
+      const url = this.opts.versionUrl
+      const sep = url.includes('?') ? '&' : '?'
+      const resp = await fetch(`${url}${sep}${CACHE_BUSTER}=${Date.now()}`, { cache: 'no-store' })
       if (!resp.ok) return false
       info = await resp.json()
     } catch {
       return false // offline / transient network error — try again next tick, don't crash the app over it
     }
-    if (!info?.version || info.version === this.currentVersion) return false
+    if (!info?.version) return false
+    // Build id first: it identifies the deployment, while version only identifies the release.
+    // Two deploys that never bumped package.json — or a rollback — are invisible to a version
+    // compare, and that silence is the failure nobody notices.
+    const changed = this.buildId && info.buildId
+      ? info.buildId !== this.buildId
+      : info.version !== this.currentVersion
+    if (!changed) return false
     this.handleUpdateFound(info)
     return true
   }
@@ -153,15 +182,27 @@ export class UpdateChecker {
     // 'modal-blocking': do nothing further here — caller's UI calls applyUpdate() on click.
   }
 
-  /** Force the refresh now (what 'modal-blocking' UIs call on button click). Respects the cooldown guard. */
-  applyUpdate() {
+  /**
+   * Refresh now (what 'modal-blocking' UIs call on button click). Respects the cooldown guard,
+   * which exists to stop *automatic* reload loops: pass `{ force: true }` — or call `refreshNow()`
+   * — for an explicit user action, otherwise a click inside the cooldown window does nothing,
+   * which reads as a dead button.
+   */
+  applyUpdate(options: { force?: boolean } = {}) {
     if (typeof window === 'undefined') return
     const last = Number(sessionStorage.getItem(COOLDOWN_KEY) || 0)
-    if (Date.now() - last < this.opts.refreshCooldown) return // inside cooldown — avoid a refresh loop
-    sessionStorage.setItem(COOLDOWN_KEY, String(Date.now()))
+    if (!options.force && Date.now() - last < this.opts.refreshCooldown) return
     this.opts.onBeforeRefresh?.()
     this.emit('refreshing', this._latestInfo)
+    // Written last: a throwing onBeforeRefresh/refresh listener must not arm the cooldown and
+    // leave the page un-refreshed and un-refreshable for the next `refreshCooldown` ms.
+    sessionStorage.setItem(COOLDOWN_KEY, String(Date.now()))
     window.location.reload()
+  }
+
+  /** "立即刷新" click: a human asking for it outranks the loop guard. */
+  refreshNow() {
+    this.applyUpdate({ force: true })
   }
 
   on(event: UpdateEvent, listener: UpdateListener): () => void {
