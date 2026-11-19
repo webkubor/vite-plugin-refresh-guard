@@ -158,6 +158,7 @@ interface VersionCheckerOptions {
 ```ts
 interface RefreshGuardPluginOptions {
   version?: string        // 默认读 package.json
+  buildId?: string        // 部署身份，默认用 git short SHA；monorepo/无 git 场景自己传
   includeCommit?: boolean // 默认 true；非 git 仓库时静默省略，不报错
   outFile?: string        // 默认 'version.json'
   changelog?: string | false | {
@@ -168,6 +169,23 @@ interface RefreshGuardPluginOptions {
   }
 }
 ```
+
+### `buildId`：客户端到底在比什么
+
+运行时比的是 `buildId` 而不是 `version`，因为 `buildId` 回答的是「我正在跑的这份产物，还是服务器现在发的这份吗」。
+
+| 场景 | 默认值 | 你可能要做的 |
+|---|---|---|
+| 单仓单应用 | git short SHA | 什么都不用做 |
+| 单仓多应用，但**按改动路径分别部署**（`turbo --filter`） | git short SHA | 不用做——只部署 A 时 B 的 `version.json` 不会更新 |
+| 单仓多应用，**全量构建全量部署** | git short SHA | 传 app 级身份：`buildId: \`${commit}-${process.env.APP_NAME}\`` |
+| tarball / Docker 内没有 `.git` | 回落到 `version` | 传 CI 构建号：`buildId: process.env.CI_BUILD_ID` |
+| `includeCommit: false` | 回落到 `version` | 同上——别指望它精确，但它是**稳定的** |
+
+两种边界要知道：
+
+- **不会因为「产物字节没变但 commit 变了」而少报。** commit 是仓库级的，粒度比产物粗，宁可多提示一次。
+- **回落值永远不用时间戳。** 时间戳每次构建都不同，等于每次部署都提示刷新——那是把检测器变成警报器，用户会直接学会忽略它。
 
 ## 更新日志展示（全量导出与运行时拉取）
 

@@ -1,11 +1,27 @@
 # 更新日志
 
+## v0.4.1 (2026-11-19)
+
+> **一句话摘要**：修掉 `buildId` 的时间戳回落——它让**每次构建**都产生新身份，于是每次部署都提示刷新；同时新增 `buildId` 配置项，让 monorepo 能传 app 级身份。
+
+### 🐛 缺陷修复 (Bug Fixes)
+- **`buildId` 回落值不再用 `Date.now()`**：无 git 环境（tarball / Docker 内无 `.git`）或 `includeCommit: false` 时，原先回落时间戳。时间戳每次构建都不同，等价于「每次部署都判定为新版本」——用户每次打开都被要求刷新，检测器退化成警报器，最终被用户学会忽略。现回落 `version`：粒度粗、会漏检，但**稳定**，且语义与用户预期一致。
+- **`generateBundle` 的兜底同源修正**：产物里的 `buildId` 与 `define` 注入值保持一致，不再各自回落。
+
+### ✨ 新增 (Features)
+- **`buildId` 配置项**：显式指定部署身份，优先级高于 git commit 与 `version`，`configResolved` 阶段也不会被 commit 覆盖。用于两类场景：
+  - monorepo「全量构建全量部署」：commit 是仓库级的，只改 A 也提示 B → 传 `` `${commit}-${process.env.APP_NAME}` `` 收敛到 app 粒度；
+  - 无 git 的构建环境：传 CI 构建号 `process.env.CI_BUILD_ID`。
+
+### ⚠️ 破坏性变更与迁移 (Breaking Changes & Migration)
+- 无破坏性变更。唯一行为差异：依赖「时间戳回落 = 每次部署必提示」的用法会变成按 `version` 比对。若需要每次都提示，显式传 `buildId: String(Date.now())`。
+
 ## v0.4.0 (2026-11-18)
 
 > **一句话摘要**：检测基准从 `version` 换成 `buildId`（部署身份）——忘 bump 版本号的连续发版、回滚部署，从此都看得见；同时修掉 CDN 缓存造成的假阴性，以及弹窗「立即刷新」在冷却期内的死按钮。
 
 ### ✨ 行为变更 (Behavior)
-- **`buildId` 成为首选比对基准**：构建期取 git short SHA（无 git 环境回落时间戳），由插件 `define` 同时注入客户端（`__REFRESH_GUARD_BUILD_ID__`）与 `version.json`。运行时两侧都有 buildId 就比 buildId，否则回落比 `version`（老部署 / 第三方 manifest 不受影响）。
+- **`buildId` 成为首选比对基准**：构建期取 git short SHA（无 git 环境回落时间戳，**该回落已于 0.4.1 改为回落 `version`**），由插件 `define` 同时注入客户端（`__REFRESH_GUARD_BUILD_ID__`）与 `version.json`。运行时两侧都有 buildId 就比 buildId，否则回落比 `version`（老部署 / 第三方 manifest 不受影响）。
   - 修的场景：CI 里 `package.json` 版本号连续几次发版都没动 → 旧行为完全检测不到更新，且表现为静默失效。
   - 回滚部署同样能感知：version 比对在这个方向上最容易判错（旧 bundle 看到「更老的 version」反而当成新版本）。
   - buildId 可复现：同一 commit 构建多次得到同一个值，线上排查能直接对回提交。

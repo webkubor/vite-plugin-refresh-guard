@@ -144,6 +144,7 @@ Plugin options (`refreshGuard({ ... })`):
 ```ts
 interface RefreshGuardPluginOptions {
   version?: string        // default: read from package.json
+  buildId?: string        // deployment identity, default: git short SHA; pass your own for monorepos / no-git
   includeCommit?: boolean // default true; silently omitted outside a git repo
   outFile?: string        // default 'version.json'
   changelog?: string | false | {
@@ -154,6 +155,23 @@ interface RefreshGuardPluginOptions {
   }
 }
 ```
+
+### `buildId`: what the client is actually comparing
+
+The runtime compares `buildId`, not `version`, because it answers "is the build I'm running still the one being served?".
+
+| Situation | Default | What you may need to do |
+|---|---|---|
+| Single app, single repo | git short SHA | Nothing |
+| Monorepo deploying **only changed apps** (`turbo --filter`) | git short SHA | Nothing — app B's `version.json` isn't rewritten when only A ships |
+| Monorepo doing a **full rebuild + full deploy** | git short SHA | Pass an app-scoped id: `buildId: \`${commit}-${process.env.APP_NAME}\`` |
+| Tarball / Docker image with no `.git` | falls back to `version` | Pass the CI build number: `buildId: process.env.CI_BUILD_ID` |
+| `includeCommit: false` | falls back to `version` | Same — not precise, but **stable** |
+
+Two edges worth knowing:
+
+- **It may over-report when bytes are identical but the commit moved.** A commit is repo-wide, coarser than the artifact. One extra reload beats running stale code forever.
+- **The fallback is never a timestamp.** A timestamp differs on every build, so every deploy would prompt a reload — that turns a detector into a false alarm users learn to ignore.
 
 ## Changelog Display (Full export and Runtime fetch)
 

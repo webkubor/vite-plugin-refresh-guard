@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readChangelog } from '../src/index.js'
@@ -201,7 +202,7 @@ describe('refreshGuard plugin with changelog options', () => {
     }
   })
 
-  it('define 注入 buildId，且与 version.json 里的 buildId 一致（无 git 时回落时间戳）', async () => {
+  it('define 注入 buildId，且与 version.json 里的 buildId 一致', async () => {
     const { refreshGuard } = await import('../src/index.js')
     const plugin = refreshGuard()
     const emitted: any[] = []
@@ -210,7 +211,7 @@ describe('refreshGuard plugin with changelog options', () => {
       addWatchFile: () => {},
     }
 
-    // tmpdir 不是 git 仓库 → 走 Date.now() 兜底，但 define 与产物必须同源
+    // tmpdir 不是 git 仓库 → 回落到 version（不是时间戳），define 与产物必须同源
     const returned = (plugin.config as any).call(
       fakeContext,
       { root: dir } as any,
@@ -224,5 +225,120 @@ describe('refreshGuard plugin with changelog options', () => {
     const manifest = JSON.parse(emitted.find(e => e.fileName === 'version.json').source)
     expect(manifest.buildId).toBe(JSON.parse(returned.define.__REFRESH_GUARD_BUILD_ID__))
     expect(manifest.buildId).not.toBe('')
+  })
+
+  // 回归：曾经回落 Date.now()，导致「同一次部署重新构建」也换 id，
+  // 每次部署都提示刷新——比 commit 的过度提示严重得多。
+  it('无 git 时 buildId 回落 version，且连续两次构建完全一致（不再用时间戳）', async () => {
+    const { refreshGuard } = await import('../src/index.js')
+    const defineOf = () => {
+      const plugin = refreshGuard({ version: '1.0.0' })
+      const ctx = { emitFile: () => {}, addWatchFile: () => {} }
+      const ret = (plugin.config as any).call(ctx, { root: dir } as any, {
+        command: 'build',
+        mode: 'production',
+      }) as { define: Record<string, string> }
+      ;(plugin.configResolved as any).call(ctx, { root: dir } as any)
+      return JSON.parse(ret.define.__REFRESH_GUARD_BUILD_ID__) as string
+    }
+
+    const first = defineOf()
+    const second = defineOf()
+    expect(first).toBe('1.0.0')
+    expect(second).toBe(first) // 关键：可复现，不会把每次构建都当成新版本
+  })
+
+  it('显式 buildId 覆盖 commit 与 version（monorepo 里传 app 级身份）', async () => {
+    const { refreshGuard } = await import('../src/index.js')
+    const plugin = refreshGuard({ version: '1.0.0', buildId: '1.0.0-web-a-42' })
+    const emitted: any[] = []
+    const ctx = { emitFile: (a: any) => emitted.push(a), addWatchFile: () => {} }
+
+    const ret = (plugin.config as any).call(ctx, { root: dir } as any, {
+      command: 'build',
+      mode: 'production',
+    }) as { define: Record<string, string> }
+    ;(plugin.configResolved as any).call(ctx, { root: dir } as any)
+    ;(plugin.generateBundle as any).call(ctx, {} as any, {} as any, false)
+
+    const manifest = JSON.parse(emitted.find(e => e.fileName === 'version.json').source)
+    expect(JSON.parse(ret.define.__REFRESH_GUARD_BUILD_ID__)).toBe('1.0.0-web-a-42')
+    expect(manifest.buildId).toBe('1.0.0-web-a-42')
+  })
+
+  it('includeCommit:false 时 version.json 不带 commit，buildId 仍稳定', async () => {
+    const { refreshGuard } = await import('../src/index.js')
+    const plugin = refreshGuard({ version: '2.3.4', includeCommit: false })
+    const emitted: any[] = []
+    const ctx = { emitFile: (a: any) => emitted.push(a), addWatchFile: () => {} }
+
+    ;(plugin.config as any).call(ctx, { root: dir } as any, { command: 'build', mode: 'production' })
+    ;(plugin.configResolved as any).call(ctx, { root: dir } as any)
+    ;(plugin.generateBundle as any).call(ctx, {} as any, {} as any, false)
+
+    const manifest = JSON.parse(emitted.find(e => e.fileName === 'version.json').source)
+    expect(manifest.commit).toBeUndefined()
+    expect(manifest.buildId).toBe('2.3.4')
+  })
+})
+
+// 这些用例需要一个真的 git 仓库：commit 是从 git 读的，mock 掉就没意义了
+function gitAvailable(): boolean {
+  try {
+    execSync('git --version', { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+describe.skipIf(!gitAvailable())('refreshGuard 与真实 git 仓库', () => {
+  let repo: string
+
+  beforeEach(() => {
+    repo = mkdtempSync(join(tmpdir(), 'rg-git-'))
+    writeFileSync(join(repo, 'package.json'), '{"name":"x","version":"3.1.0"}', 'utf-8')
+    const run = (cmd: string) => execSync(cmd, { cwd: repo, stdio: 'ignore' })
+    run('git init -q')
+    run('git config user.email t@t.t')
+    run('git config user.name t')
+    run('git add -A')
+    run('git commit -qm init')
+  })
+
+  afterEach(() => rmSync(repo, { recursive: true, force: true }))
+
+  const runPlugin = async (opts: Record<string, unknown>) => {
+    const { refreshGuard } = await import('../src/index.js')
+    const plugin = refreshGuard(opts as any)
+    const emitted: any[] = []
+    const ctx = { emitFile: (a: any) => emitted.push(a), addWatchFile: () => {} }
+    const ret = (plugin.config as any).call(ctx, { root: repo } as any, {
+      command: 'build',
+      mode: 'production',
+    }) as { define: Record<string, string> }
+    ;(plugin.configResolved as any).call(ctx, { root: repo } as any)
+    ;(plugin.generateBundle as any).call(ctx, {} as any, {} as any, false)
+    return {
+      injected: JSON.parse(ret.define.__REFRESH_GUARD_BUILD_ID__) as string,
+      manifest: JSON.parse(emitted.find(e => e.fileName === 'version.json').source),
+    }
+  }
+
+  it('默认 buildId 就等于 git short SHA', async () => {
+    const { injected, manifest } = await runPlugin({})
+    const sha = execSync('git rev-parse --short HEAD', { cwd: repo }).toString().trim()
+    expect(injected).toBe(sha)
+    expect(manifest.buildId).toBe(sha)
+    expect(manifest.commit).toBe(sha)
+  })
+
+  // 回归：显式 buildId 曾导致 commit 也读不到，version.json 丢掉唯一能对回提交的字段
+  it('显式 buildId 接管身份，但 version.json 仍保留 commit 作为排查证据', async () => {
+    const sha = execSync('git rev-parse --short HEAD', { cwd: repo }).toString().trim()
+    const { injected, manifest } = await runPlugin({ buildId: `${sha}-web-a` })
+    expect(injected).toBe(`${sha}-web-a`)
+    expect(manifest.buildId).toBe(`${sha}-web-a`)
+    expect(manifest.commit).toBe(sha)
   })
 })

@@ -27,6 +27,17 @@ export interface ChangelogPluginOptions {
 export interface RefreshGuardPluginOptions {
   /** Version string to bake into version.json and the `__REFRESH_GUARD_VERSION__` define. Default: read from the project's package.json. */
   version?: string
+  /**
+   * Deployment identity baked into both the `__REFRESH_GUARD_BUILD_ID__` define and version.json —
+   * this is what the runtime compares, so it must mean "which build is this".
+   *
+   * Default: the short git SHA. Override it when the default is too coarse or too fine:
+   * - monorepo where one repo deploys several apps — a commit to app A would otherwise tell
+   *   app B's users to reload. Pass something app-scoped from CI, e.g. `${commit}-${appName}`.
+   * - archives/tarball deploys with no git — pass the CI build number.
+   * Read straight from `process.env` at config time; that's what makes per-app CI values usable.
+   */
+  buildId?: string
   /** Include the short git commit hash in version.json. Default: true — silently omitted outside a git repo (e.g. a tarball deploy), never throws. */
   includeCommit?: boolean
   /** Filename for the emitted version manifest, relative to the build output dir. Default: 'version.json'. */
@@ -89,8 +100,8 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
   let version = options.version
   // Deployment identity, not a "release number": it answers "is the build I'm running still the
   // one being served?". Derived from the commit so it's reproducible (same commit → same id) and
-  // greppable when debugging production. Timestamp is only the no-git fallback.
-  let buildId = ''
+  // greppable when debugging production.
+  let buildId = options.buildId || ''
   let commit = ''
   // changelog 绝对路径（dev 下热更新要监听它）；changelog:false 时为空串
   let changelogPath = ''
@@ -112,9 +123,15 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
       }
       // The client needs to know its own build id to compare against version.json — resolving it
       // here (not in generateBundle) is what makes the `define` possible.
+      // The commit is read either way: it's the evidence that ties a deployed artifact back to a
+      // source revision, and that stays useful even when the caller has taken over `buildId`.
+      if (options.includeCommit !== false) commit = readGitCommit(root)
       if (!buildId) {
-        commit = options.includeCommit === false ? '' : readGitCommit(root)
-        buildId = commit || String(Date.now())
+        // Never `Date.now()`: a timestamp is unique per build, so every deploy would look like a
+        // new version and every user would be told to reload — even when the bytes are identical.
+        // Falling back to `version` degrades to release-level detection, which is honest and
+        // stable; a false alarm on every deploy just teaches users to ignore the prompt.
+        buildId = commit || version || '0.0.0'
       }
       return {
         define: {
@@ -133,9 +150,10 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
       changelogPath = options.changelog === false ? '' : resolve(config.root, relFile)
       // `config()` already resolved commit/buildId from `userConfig.root`; only retry when that
       // root was absent or pointed somewhere gitless — the resolved root is the authoritative one.
+      // An explicit `buildId` is never overwritten; only the commit evidence gets filled in.
       if (!commit && options.includeCommit !== false) {
         commit = readGitCommit(config.root)
-        if (commit && buildId !== commit) buildId = commit
+        if (!options.buildId && commit) buildId = commit
       }
     },
     resolveId(id) {
@@ -188,7 +206,7 @@ export function refreshGuard(options: RefreshGuardPluginOptions = {}): Plugin {
       const manifest = {
         version: version ?? '0.0.0',
         // Only reachable without a prior config() pass (e.g. a hand-rolled pipeline).
-        buildId: buildId || String(Date.now()),
+        buildId: buildId || version || '0.0.0',
         commit: commit || undefined,
         time: new Date().toISOString(),
       }
