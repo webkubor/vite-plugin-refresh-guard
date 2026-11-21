@@ -29,6 +29,39 @@ npm i -D vite-plugin-refresh-guard
 
 `vue`, `react`/`react-dom`, and `vite` are peer dependencies — install whichever you actually use.
 
+## Minimal example
+
+Just want users to land on the new code after a deploy, with no UI at all? Three files are enough (Vue shown):
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { refreshGuard } from 'vite-plugin-refresh-guard'
+
+export default defineConfig({
+  plugins: [vue(), refreshGuard()],
+})
+```
+
+```ts
+// env.d.ts
+/// <reference types="vite-plugin-refresh-guard/client" />
+```
+
+```vue
+<!-- App.vue -->
+<script setup lang="ts">
+import { useVersionCheck } from 'vite-plugin-refresh-guard/vue'
+
+useVersionCheck(__REFRESH_GUARD_VERSION__, { mode: 'silent' })
+</script>
+```
+
+In `silent` mode a detected update reloads the page directly, so no component needs to be mounted. React works the same way: call `useVersionCheck(__REFRESH_GUARD_VERSION__, { mode: 'silent' })` from `vite-plugin-refresh-guard/react` in your root component.
+
+`version.json` is only emitted by `vite build`, so verify against the build output with `vite preview` or any static server. For a toast or a modal, read on to Quick start.
+
 ## Quick start
 
 **`vite.config.ts`**
